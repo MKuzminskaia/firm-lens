@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("0.2 Layer")
+st.title("0.25 Layer")
 st.header("Hello Streamlit + downloading CSV")
 
 uploaded_file = st.file_uploader("Upload data", type="csv")
@@ -22,16 +22,19 @@ NEG_RULES = {
 
 def score(text: str): #-> int:
     total_score = 0
+    reasons = []
     
     for word, pts in POS_RULES.items():
         if word in text.lower():
             total_score += pts
+            reasons.append(f"+{pts}:{word}")
 
     for word, pts in NEG_RULES.items():
         if word in text.lower():
             total_score += pts
+            reasons.append(f"{pts}:{word}")
 
-    return total_score
+    return total_score, "; ".join(reasons)
 
 if uploaded_file is not None:
     st.success("File uploaded")
@@ -40,7 +43,7 @@ if uploaded_file is not None:
     table_columns = df.columns.to_list()
     st.write("Table size is ", df.shape)
     
-    st.dataframe(df.head(10))
+    #st.dataframe(df.head(10))
 
     table_columns_name = st.selectbox(
         "Select column name of table: ",
@@ -48,18 +51,28 @@ if uploaded_file is not None:
     )
     
     out = df.copy()
-    out['score_column'] = out[table_columns_name].astype(str).apply(score)
+    
+    out[['score_column', 'reason_column']] = out[table_columns_name].astype(str).apply(score).apply(pd.Series)
 
     out = out.sort_values(by='score_column', ascending=False).reset_index(drop=True)
 
-    st.dataframe(out.head(10))
+    #st.dataframe(out.head(10))
 
-    csv = out.to_csv(index = False).encode("utf-8")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.header('Before:')
+        st.dataframe(df.head(10))
+    with col2: 
+        st.header('After')
+        st.dataframe(out.head(10))
+    csv = out.to_csv(index = False, sep=';').encode("utf-8")
 
     st.download_button(
         label = "Download CSV",
         data = csv,
         file_name = "data.csv",
+
     )
 
 else: 
