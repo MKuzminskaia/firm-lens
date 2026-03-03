@@ -13,7 +13,7 @@ POS_RULES = {
     "health": 25,
     "clinic": 20,
     "ai": 10,
-    "software": 10,
+    "internet": 10,
 }
 
 NEG_RULES = {
@@ -129,8 +129,6 @@ def search_company(company_name :str, website: str, country: str):
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
     company_id = company_id.strip()
-   
-    st.write(f'company_id: {company_id}')
 
     default_result = COMPANY_LIST_FOR_ENRICHING.copy()
     default_result[0]['company_id'] = company_id
@@ -310,39 +308,29 @@ if 'founded_list_of_companies' in st.session_state:
         for row_number in selected_rows:
             choosen_rows.append(df.iloc[row_number])
         st.session_state['selected_companies_for_enriching'] = choosen_rows
-        st.success(f"You choose:{choosen_rows}, and in it number one is: {choosen_rows[0]['company_id']}")
 
 if choosen_rows and table_columns_name:
     try:
-        company_id : str
-        company_id = choosen_rows[0]['company_id']
-
+        enriched_data = []
         with st.spinner("Searching data in Wikidata..."):
-            enriched_data = enrich(company_id, '', '')
-
-        current_table = []
-        current_table = st.session_state['company_list_for_enriching']
-        current_table.append(enriched_data)
+            for row in choosen_rows:
+                enriched_data.append(enrich(row['company_id'], '', ''))
         
-        if (current_table[0]['company_id'] == 'empty'):
-                current_table.pop(0)
+        
+        if (enriched_data[0]['company_id'] == 'empty'):
+                enriched_data.pop(0)
 
-        final_df = pd.DataFrame(current_table)
+        final_df = pd.DataFrame(enriched_data)
+
+       # st.write(final_df)
         final_df[['score_column', 'reason_column']] = final_df[table_columns_name].fillna("").astype(str).agg(" ".join , axis=1).apply(score).apply(pd.Series)
 
-        st.session_state['company_list_for_enriching'] = current_table
+        st.session_state['company_list_for_enriching'] = enriched_data
 
         if enriched_data:     
             
             st.subheader("Result of deep analysis:")
             st.table(final_df) 
-            
-            # count scoring
-            text_to_score = f"{enriched_data['company_name']} {enriched_data['industry']} {enriched_data['country']}"
-            total_score, reason = score(text_to_score)
-            
-            st.metric("The company's final score", f"{total_score} pts")
-            st.caption(f"Justification: {reason}")
 
     except Exception as e:
         st.write(e)
