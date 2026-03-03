@@ -129,8 +129,13 @@ def search_company(company_name :str, website: str, country: str):
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
     company_id = company_id.strip()
-    default_result = COMPANY_LIST_FOR_ENRICHING.copy
-    default_result['company_id'] = company_id
+   
+    st.write(f'company_id: {company_id}')
+
+    default_result = COMPANY_LIST_FOR_ENRICHING.copy()
+    default_result[0]['company_id'] = company_id
+
+    
 
     if not company_id or company_id == 'N/A':
         raise ValueError("Company Name is empty")
@@ -280,12 +285,15 @@ table_columns_name = st.multiselect(
     "Select column name of table for enriching: ",
     table_columns,
 )
-    
+
+
 if not table_columns_name:
     st.error("Choose at least one column name for further work")
 
 selected_rows = []
 choosen_row = {}
+choosen_rows = []
+
 
 if 'founded_list_of_companies' in st.session_state:
     df = pd.DataFrame(st.session_state['founded_list_of_companies'])
@@ -300,25 +308,24 @@ if 'founded_list_of_companies' in st.session_state:
     
     if st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and selected_rows:
         for row_number in selected_rows:
-            choosen_rows = df.iloc[row_number]
+            choosen_rows.append(df.iloc[row_number])
         st.session_state['selected_companies_for_enriching'] = choosen_rows
-        st.write(choosen_rows)
-        st.success(f"You choose:{choosen_rows}, {choosen_rows['company_name']}")
+        st.success(f"You choose:{choosen_rows}, and in it number one is: {choosen_rows[0]['company_id']}")
 
-if selected_rows and table_columns_name:
+if choosen_rows and table_columns_name:
     try:
-        company_id = st.session_state['selected_companies_for_enriching']['company_id']
+        company_id : str
+        company_id = choosen_rows[0]['company_id']
 
         with st.spinner("Searching data in Wikidata..."):
             enriched_data = enrich(company_id, '', '')
 
-        current_table = {}
+        current_table = []
         current_table = st.session_state['company_list_for_enriching']
         current_table.append(enriched_data)
         
-        if (current_table['company_id'][0] == 'empty'):
-            for key in current_table:
-                current_table[key].pop(0)
+        if (current_table[0]['company_id'] == 'empty'):
+                current_table.pop(0)
 
         final_df = pd.DataFrame(current_table)
         final_df[['score_column', 'reason_column']] = final_df[table_columns_name].fillna("").astype(str).agg(" ".join , axis=1).apply(score).apply(pd.Series)
