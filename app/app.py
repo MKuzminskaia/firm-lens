@@ -45,11 +45,10 @@ COMPANY_LIST_FOR_ENRICHING = [
         'website' : 'empty', 
         'country' : 'empty',
         'industry' : 'empty',
-        'score_column' : 'empty',
-        'reason_column': 'empty'
     }
 ]
 
+# session_state default values
 if "pos_rules" not in st.session_state: 
     st.session_state["pos_rules"] = POS_RULES.copy()
 if "neg_rules" not in st.session_state:
@@ -67,7 +66,7 @@ if "selected_companies_for_enriching" not in st.session_state:
     st.session_state['selected_companies_for_enriching'] = ''
 # Finaly list of companies    
 if "company_list_for_enriching" not in st.session_state:
-    st.session_state['company_list_for_enriching'] = COMPANY_LIST_FOR_ENRICHING.copy()
+    st.session_state['company_list_for_enriching'] = []
 
 # clean garbage words wrom list GARBAGE_WORDS
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -130,10 +129,13 @@ def search_company(company_name :str, website: str, country: str):
 def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
     company_id = company_id.strip()
 
-    default_result = COMPANY_LIST_FOR_ENRICHING.copy()
-    default_result[0]['company_id'] = company_id
-
-    
+    default_result = {
+        'company_id' : company_id,
+        'company_name' : country,
+        'website' : website,
+        'country' : 'N/A',
+        'industry' : 'N/A'
+    }
 
     if not company_id or company_id == 'N/A':
         raise ValueError("Company Name is empty")
@@ -174,10 +176,12 @@ def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
             st.error(f"Error enriching {company_name}: {e}") 
     return default_result
 
+# convert dict to str
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def rules_to_str(rules: dict[str, int]) -> str:
     return "\n".join(f"{k}:{v}" for k,v in rules.items())
 
+# total score and reasons for dict (one row of table)
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def score(text: str) -> dict [str, str]:
     total_score = 0
@@ -200,6 +204,7 @@ def score(text: str) -> dict [str, str]:
 
     return str(total_score), "; ".join(reasons)
 
+# analyses rules for scoring
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def rules_parser(rule :str) -> dict[str, int]:
     result :dict[str, int] = {}
@@ -228,6 +233,7 @@ def rules_parser(rule :str) -> dict[str, int]:
 
     return result 
 
+# sidebar with rules for scoring
 with st.sidebar:
     txt_pos = st.text_area(
         "Write positive rules:",
@@ -254,7 +260,7 @@ with st.sidebar:
 
     #table_columns = df.columns.to_list()
 
-
+# menu for company info entering
 company_name = clean_str(st.text_input("Company name: ", "Google inc"))
 website = st.text_input("website: ", "https://")
 country = st.text_input("Country: ")
@@ -267,8 +273,8 @@ search_info = {
 
 results_df = pd.DataFrame([search_info])
 
-st.write(search_info)
 
+# searching companies based on entered data
 if st.button("Submit", key = 'btn_submit_to_search_company'):
     try:
         rare_data = search_company(search_info['company_name'], '', '')
@@ -277,12 +283,13 @@ if st.button("Submit", key = 'btn_submit_to_search_company'):
     except Exception as e:
         st.write(e)
 
-
+# choosing columns for scoring 
 table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
 table_columns_name = st.multiselect(
     "Select column name of table for enriching: ",
     table_columns,
 )
+st.session_state['table_columns_name'] = table_columns_name
 
 
 if not table_columns_name:
@@ -291,8 +298,13 @@ if not table_columns_name:
 selected_rows = []
 choosen_row = {}
 choosen_rows = []
+enriched_data = []
+if st.session_state['company_list_for_enriching']:
+    enriched_data = st.session_state['company_list_for_enriching']
+    
 
 
+# enriching list of new selected companies
 if 'founded_list_of_companies' in st.session_state:
     df = pd.DataFrame(st.session_state['founded_list_of_companies'])
     s = st.dataframe(df, 
@@ -305,27 +317,25 @@ if 'founded_list_of_companies' in st.session_state:
     st.success(f"You choose:{selected_rows}")
     
     if st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and selected_rows:
-        for row_number in selected_rows:
-            choosen_rows.append(df.iloc[row_number])
-        st.session_state['selected_companies_for_enriching'] = choosen_rows
-
-if choosen_rows and table_columns_name:
-    try:
-        enriched_data = []
+        
         with st.spinner("Searching data in Wikidata..."):
-            for row in choosen_rows:
-                enriched_data.append(enrich(row['company_id'], '', ''))
-        
-        
-        if (enriched_data[0]['company_id'] == 'empty'):
-                enriched_data.pop(0)
+            for row_number in selected_rows:
+                row = df.iloc[row_number].to_dict()  
+                st.warning(row)
+                new_data = enrich(row['company_id'], '', '')
+                enriched_data.append(new_data)
+            st.session_state['company_list_for_enriching'] = enriched_data    
+
+# generating final table (enriched with scoring)
+if st.session_state['company_list_for_enriching']:
+    try:
 
         final_df = pd.DataFrame(enriched_data)
 
-       # st.write(final_df)
+        if not table_columns_name:
+            table_columns_name = st.session_state['table_columns_name']
+        st.write(table_columns_name)    
         final_df[['score_column', 'reason_column']] = final_df[table_columns_name].fillna("").astype(str).agg(" ".join , axis=1).apply(score).apply(pd.Series)
-
-        st.session_state['company_list_for_enriching'] = enriched_data
 
         if enriched_data:     
             
