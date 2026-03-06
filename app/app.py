@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json as js
-import requests 
+
 
 st.title("0.5 Layer")
 st.header("Firm-Lens")
@@ -29,8 +29,6 @@ ENRICH = {
     "enrich_status": "not_found",  # "hit" | "not_found" | "error",
     "enrich_source": "wikidata"
 }
-
-GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corp']
 
 SEARCH_INFO = {
     'company_name' : 'empty',  
@@ -68,14 +66,6 @@ if "selected_companies_for_enriching" not in st.session_state:
 if "company_list_for_enriching" not in st.session_state:
     st.session_state['company_list_for_enriching'] = []
 
-# clean garbage words wrom list GARBAGE_WORDS
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def clean_str(dirty_str: str) -> str:
-    for garbage_word in GARBAGE_WORDS:
-        dirty_str = dirty_str.replace(garbage_word, "")
-    dirty_str = dirty_str.strip()
-    dirty_str = dirty_str[0].upper() + dirty_str[1:len(dirty_str)]
-    return dirty_str
 
 
 # returns a short list of companies that match the parameters 
@@ -176,10 +166,6 @@ def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
             st.error(f"Error enriching {company_name}: {e}") 
     return default_result
 
-# convert dict to str
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def rules_to_str(rules: dict[str, int]) -> str:
-    return "\n".join(f"{k}:{v}" for k,v in rules.items())
 
 # total score and reasons for dict (one row of table)
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -204,34 +190,6 @@ def score(text: str) -> dict [str, str]:
 
     return str(total_score), "; ".join(reasons)
 
-# analyses rules for scoring
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def rules_parser(rule :str) -> dict[str, int]:
-    result :dict[str, int] = {}
-
-    for line in rule.splitlines():
-        line = line.strip()
-
-        if not line:
-            continue
-        if ":" not in line:
-            continue
-
-        key, value = line.split(':',1)
-
-        key = key.strip().lower()
-
-        if not key:
-            continue
-
-        value = value.strip()
-
-        try:
-            result[key] = int(value)
-        except ValueError:
-            continue
-
-    return result 
 
 # sidebar with rules for scoring
 with st.sidebar:
