@@ -6,8 +6,7 @@ GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corp']
 def clean_str(dirty_str: str) -> str:
     for garbage_word in GARBAGE_WORDS:
         dirty_str = dirty_str.replace(garbage_word, "")
-    dirty_str = dirty_str.strip()
-    dirty_str = dirty_str[0].upper() + dirty_str[1:len(dirty_str)]
+    dirty_str = dirty_str.strip().capitalize()
     return dirty_str
 
 # convert dict to str

@@ -2,8 +2,11 @@ import streamlit as st
 import pandas as pd
 import json as js
 
+from core.models import Company
+from core.services import WikidataService, ScorerService
+from core.utils import clean_str, rules_to_str, rules_parser
 
-st.title("0.5 Layer")
+st.title("0.6 Layer")
 st.header("Firm-Lens")
 
 #uploaded_file = st.file_uploader("Upload data", type="csv")
@@ -68,127 +71,7 @@ if "company_list_for_enriching" not in st.session_state:
 
 
 
-# returns a short list of companies that match the parameters 
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def search_company(company_name :str, website: str, country: str): 
-    company_name = company_name.strip()
-    company_name = clean_str(company_name.lower())
-    result_info = []
 
-    if not company_name:
-        raise ValueError("Company Name is empty")
-    else: 
-        query = f"""SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
-                ?item rdfs:label "{company_name}"@en ."""
-        if website:
-            query += f"""?item wdt:P856 "<{website}>" ."""    
-        if country:
-            query += f"""?item wdt:P17 "{country}"@en ."""    
-        query += f"""?item wdt:P31 wd:Q4830453 .
-                OPTIONAL {{ ?item wdt:P856 ?website. }}
-                OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
-                OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
-                SERVICE wikibase:label {{bd:serviceParam wikibase:language "en". }}
-                }}
-                """
-        url = "https://query.wikidata.org/sparql"
-        headers = {'User-Agent': 'FirmLensBot/1.0 (blackmarka@gmail.com)', 'Accept': 'application/sparql-results+json'}
-
-        try:
-            response = requests.get(url, params = {'query' : query, 'format': 'json'}, headers = headers, timeout=10)
-            data = response.json()
-            results = data.get('results', {}).get('bindings', [])
-
-            if results:
-                for res in results:
-                    one_company_result = {
-                        'company_id' : res.get('item', {}).get('value', "N/A"),
-                        'company_name' : res.get('itemLabel', {}).get('value', "N/A"),
-                        'website' : res.get('website', {}).get('value', "N/A"),
-                        'country' : res.get('countryLabel', {}).get('value', "N/A"),
-                        'industry' : res.get('industryLabel', {}).get('value', "N/A")
-                    }
-                    result_info.append(one_company_result)
-        except Exception as e:
-            st.error(f"Error enriching {company_name}: {e}") 
-
-    return result_info
-
-# returns the enriched list of one company by id 
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def enrich(company_id :str, website: str, country: str) -> dict [str, str]:
-    company_id = company_id.strip()
-
-    default_result = {
-        'company_id' : company_id,
-        'company_name' : country,
-        'website' : website,
-        'country' : 'N/A',
-        'industry' : 'N/A'
-    }
-
-    if not company_id or company_id == 'N/A':
-        raise ValueError("Company Name is empty")
-    else: 
-        company_id = company_id.split('/')[-1]
-        query = f"""SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
-                BIND(wd:{company_id} AS ?item) ."""
-        if website:
-            query += f"""?item wdt:P856 "<{website}>" ."""    
-        if country:
-            query += f"""?item wdt:P17 "{country}"@en ."""    
-        query += f"""?item wdt:P31 wd:Q4830453 .
-                OPTIONAL {{ ?item wdt:P856 ?website. }}
-                OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
-                OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
-                SERVICE wikibase:label {{bd:serviceParam wikibase:language "en". }}
-                }}
-                """
-        url = "https://query.wikidata.org/sparql"
-        headers = {'User-Agent': 'FirmLensBot/1.0 (blackmarka@gmail.com)', 'Accept': 'application/sparql-results+json'}
-
-        try:
-            response = requests.get(url, params = {'query' : query, 'format': 'json'}, headers = headers, timeout=10)
-            data = response.json()
-            enriched_result = data.get('results', {}).get('bindings', [])
-
-            if enriched_result:
-                res = enriched_result[0]
-                return {
-                    'company_id' : res.get('item', {}).get('value', "N/A"),
-                    'company_name' : res.get('itemLabel', {}).get('value', "N/A"),
-                    'website' : res.get('website', {}).get('value', "N/A"),
-                    'country' : res.get('countryLabel', {}).get('value', "N/A"),
-                    'industry' : res.get('industryLabel', {}).get('value', "N/A")
-                }
-
-        except Exception as e:
-            st.error(f"Error enriching {company_name}: {e}") 
-    return default_result
-
-
-# total score and reasons for dict (one row of table)
-#--------------------------------------------------------------------------------------------------------------------------------------------------------
-def score(text: str) -> dict [str, str]:
-    total_score = 0
-    reasons = []
-    if not text:
-        raise ValueError("Column with this name is empty")
-    else:
-        pos_rules :dict [str, int] = st.session_state["pos_rules"]
-        neg_rules :dict [str, int] = st.session_state["neg_rules"]
-        
-        for word, pts in pos_rules.items():
-            if word in text.lower():
-                total_score += pts
-                reasons.append(f"+{pts}:{word}")
-
-        for word, pts in neg_rules.items():
-            if word in text.lower():
-                total_score += pts
-                reasons.append(f"{pts}:{word}")
-
-    return str(total_score), "; ".join(reasons)
 
 
 # sidebar with rules for scoring
@@ -231,13 +114,27 @@ search_info = {
 
 results_df = pd.DataFrame([search_info])
 
+if "wiki_service" not in st.session_state: 
+    st.session_state.wiki_service = WikidataService()
+
+company_for_searching : Company = Company(company_name=company_name,
+                                          company_id='N/A',
+                                          industry='N/A',
+                                          country=country,
+                                          website=website)
+
+
+#companies_found : list[Company] = []
+
 
 # searching companies based on entered data
 if st.button("Submit", key = 'btn_submit_to_search_company'):
     try:
-        rare_data = search_company(search_info['company_name'], '', '')
-        results_df = pd.DataFrame(rare_data)
-        st.session_state['founded_list_of_companies'] = rare_data
+        #rare_data = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
+        rare_data = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
+        data_for_table = [rare.to_dict() for rare in rare_data]
+        results_df = pd.DataFrame(data_for_table)
+        st.session_state['founded_list_of_companies'] = data_for_table
     except Exception as e:
         st.write(e)
 
@@ -272,15 +169,13 @@ if 'founded_list_of_companies' in st.session_state:
              )
     
     selected_rows = s['selection']['rows']
-    st.success(f"You choose:{selected_rows}")
     
     if st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and selected_rows:
         
         with st.spinner("Searching data in Wikidata..."):
             for row_number in selected_rows:
                 row = df.iloc[row_number].to_dict()  
-                st.warning(row)
-                new_data = enrich(row['company_id'], '', '')
+                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
                 enriched_data.append(new_data)
             st.session_state['company_list_for_enriching'] = enriched_data    
 
@@ -292,8 +187,13 @@ if st.session_state['company_list_for_enriching']:
 
         if not table_columns_name:
             table_columns_name = st.session_state['table_columns_name']
-        st.write(table_columns_name)    
-        final_df[['score_column', 'reason_column']] = final_df[table_columns_name].fillna("").astype(str).agg(" ".join , axis=1).apply(score).apply(pd.Series)
+        final_df[['score_column', 'reason_column']] = (
+            final_df[table_columns_name]
+            .fillna("")
+            .astype(str)
+            .agg(" ".join , axis=1)
+            .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules, st.session_state.neg_rules))
+            .apply(pd.Series))
 
         if enriched_data:     
             

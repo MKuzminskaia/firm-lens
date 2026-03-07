@@ -1,5 +1,6 @@
 import requests 
 from .models import Company
+from  core.utils import clean_str
 
 class WikidataService:
     def __init__(self):
@@ -9,13 +10,122 @@ class WikidataService:
             'Accept': 'application/sparql-results+json'
         }
 
-    def search_companies(self, name: str) -> list[Company]:
-        pass
+    # returns a short list of companies that match the parameters 
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------
+    
+    def search_companies(self, company_name :str, website: str, country: str) -> list[Company]: 
+        company_name = company_name.strip()
+        company_name = clean_str(company_name.lower())
+        result_info = []
 
-    def enrich_company(self, company_id: str) -> Company:
-        pass
+        if not company_name:
+            raise ValueError("Company Name is empty")
+        else: 
+            query = f"""SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
+                    ?item rdfs:label "{company_name}"@en ."""
+            if website:
+                query += f"""?item wdt:P856 "<{website}>" ."""    
+            if country:
+                query += f"""?item wdt:P17 "{country}"@en ."""    
+            query += f"""?item wdt:P31 wd:Q4830453 .
+                    OPTIONAL {{ ?item wdt:P856 ?website. }}
+                    OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
+                    OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
+                    SERVICE wikibase:label {{bd:serviceParam wikibase:language "en". }}
+                    }}
+                    """
+            url = "https://query.wikidata.org/sparql"
+            headers = {'User-Agent': 'FirmLensBot/1.0 (blackmarka@gmail.com)', 'Accept': 'application/sparql-results+json'}
+
+            try:
+                response = requests.get(url, params = {'query' : query, 'format': 'json'}, headers = headers, timeout=10)
+                data = response.json()
+                results = data.get('results', {}).get('bindings', [])
+
+                if results:
+                    for res in results:
+                        one_company_result : Company = Company(
+                            company_id = res.get('item', {}).get('value', "N/A"),
+                            company_name = res.get('itemLabel', {}).get('value', "N/A"),
+                            website = res.get('website', {}).get('value', "N/A"),
+                            country = res.get('countryLabel', {}).get('value', "N/A"),
+                            industry = res.get('industryLabel', {}).get('value', "N/A")
+                        )
+
+                        result_info.append(one_company_result)
+            except Exception as e:
+                #st.error(f"Error enriching {company_name}: {e}") 
+                pass
+        return result_info
+
+
+    # returns the enriched list of one company by id 
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------
+    def enrich_company(self, company_id :str, website: str, country: str) -> Company:  #-> dict [str, str]:  #-> Company:
+        company_id = company_id.strip()
+
+        result_company : Company
+
+        default_result = {
+            'company_id' : company_id,
+            'company_name' : country,
+            'website' : website,
+            'country' : 'N/A',
+            'industry' : 'N/A'
+        }
+
+        if not company_id or company_id == 'N/A':
+            raise ValueError("Company Name is empty")
+        else: 
+            company_id = company_id.split('/')[-1]
+            query = f"""SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
+                    BIND(wd:{company_id} AS ?item) ."""
+            if website:
+                query += f"""?item wdt:P856 "<{website}>" ."""    
+            if country:
+                query += f"""?item wdt:P17 "{country}"@en ."""    
+            query += f"""?item wdt:P31 wd:Q4830453 .
+                    OPTIONAL {{ ?item wdt:P856 ?website. }}
+                    OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
+                    OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
+                    SERVICE wikibase:label {{bd:serviceParam wikibase:language "en". }}
+                    }}
+                    """
+            url = "https://query.wikidata.org/sparql"
+            headers = {'User-Agent': 'FirmLensBot/1.0 (blackmarka@gmail.com)', 'Accept': 'application/sparql-results+json'}
+
+            try:
+                response = requests.get(url, params = {'query' : query, 'format': 'json'}, headers = headers, timeout=10)
+                data = response.json()
+                enriched_result = data.get('results', {}).get('bindings', [])
+
+                if enriched_result:
+                    res = enriched_result[0]
+                    result_company = Company(
+                        company_id = res.get('item', {}).get('value', "N/A"),
+                        company_name = res.get('itemLabel', {}).get('value', "N/A"),
+                        website = res.get('website', {}).get('value', "N/A"),
+                        country = res.get('countryLabel', {}).get('value', "N/A"),
+                        industry = res.get('industryLabel', {}).get('value', "N/A")
+                    )
+                    
+                    return result_company
+            except Exception as e:
+                pass
+                #st.error(f"Error enriching {company_name}: {e}") 
+        result_company = Company(
+                company_id = 'N/A',
+                company_name = 'N/A',
+                website = 'N/A',
+                country = 'N/A',
+                industry = 'N/A'
+            )
+        return result_company
+    
 
 class ScorerService:
+    # total score and reasons for dict (one row of table)
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------
     @staticmethod
     def calculate_score(text: str, pos_rules: dict, neg_rules: dict) -> tuple[int, str]:
         total_score = 0
