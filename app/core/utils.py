@@ -1,4 +1,5 @@
-
+import streamlit as st
+import pandas as pd
 GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corp']
 
 # clean garbage words wrom list GARBAGE_WORDS
@@ -43,3 +44,8 @@ def rules_parser(rule :str) -> dict[str, int]:
             continue
 
     return result 
+
+
+@st.cache_data
+def convert_df_to_csv(df : pd.DataFrame) -> bytes :
+    return df.to_csv(index = False, sep = ';').encode('utf-8')

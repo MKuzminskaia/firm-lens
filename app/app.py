@@ -4,7 +4,7 @@ import json as js
 
 from core.models import Company
 from core.services import WikidataService, ScorerService
-from core.utils import clean_str, rules_to_str, rules_parser
+from core.utils import clean_str, rules_to_str, rules_parser, convert_df_to_csv
 
 st.title("0.6 Layer")
 st.header("Firm-Lens")
@@ -187,7 +187,7 @@ if st.session_state['company_list_for_enriching']:
 
         if not table_columns_name:
             table_columns_name = st.session_state['table_columns_name']
-        final_df[['score_column', 'reason_column']] = (
+        final_df[['score', 'reasons']] = (
             final_df[table_columns_name]
             .fillna("")
             .astype(str)
@@ -200,17 +200,22 @@ if st.session_state['company_list_for_enriching']:
             st.subheader("Result of deep analysis:")
             st.table(final_df) 
 
+            # Download *.csv file 
+            csv = convert_df_to_csv(final_df)
+            file_name = "firm_lens_report"
+            st.download_button(
+                label = "Download CSV",
+                data = csv,
+                file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
+                mime="text/csv",
+                key='download-csv'
+            )
+
     except Exception as e:
         st.write(e)
 
 
-#csv = out.to_csv(index = False, sep=';').encode("utf-8")
 
-#st.download_button(
-#    label = "Download CSV",
-#    data = csv,
-#    file_name = "data.csv",
-#)
 
 #else: 
 #    st.info("No file yet")

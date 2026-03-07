@@ -1,6 +1,7 @@
 import requests 
 from .models import Company
 from  core.utils import clean_str
+import streamlit as st
 
 class WikidataService:
     def __init__(self):
@@ -12,7 +13,7 @@ class WikidataService:
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    
+    #@st.cache_data
     def search_companies(self, company_name :str, website: str, country: str) -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
