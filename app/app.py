@@ -69,9 +69,7 @@ if "selected_companies_for_enriching" not in st.session_state:
 if "company_list_for_enriching" not in st.session_state:
     st.session_state.company_list_for_enriching = []
 
-
-
-
+final_company_list : list[Company] = []
 
 
 # sidebar with rules for scoring
@@ -94,13 +92,6 @@ with st.sidebar:
         st.session_state["pos_rules"] = rules_parser(txt_pos)
         st.session_state["neg_rules"] = rules_parser(txt_neg)
 
-
-#if uploaded_file is not None:
-    #st.success("File uploaded")
-    #df = pd.read_csv(uploaded_file)
-
-    #table_columns = df.columns.to_list()
-
 # menu for company info entering
 company_name = clean_str(st.text_input("Company name: ", "Google inc"))
 website = st.text_input("website: ", "https://")
@@ -117,22 +108,11 @@ results_df = pd.DataFrame([search_info])
 if "wiki_service" not in st.session_state: 
     st.session_state.wiki_service = WikidataService()
 
-company_for_searching : Company = Company(company_name=company_name,
-                                          company_id='N/A',
-                                          industry='N/A',
-                                          country=country,
-                                          website=website)
-
-
-#companies_found : list[Company] = []
-
-
 # searching companies based on entered data
 if st.button("Submit", key = 'btn_submit_to_search_company'):
     try:
-        #rare_data = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
-        rare_data = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
-        data_for_table = [rare.to_dict() for rare in rare_data]
+        final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
+        data_for_table = [rare.to_dict() for rare in final_company_list]
         results_df = pd.DataFrame(data_for_table)
         st.session_state['founded_list_of_companies'] = data_for_table
     except Exception as e:
@@ -199,6 +179,7 @@ if st.session_state['company_list_for_enriching']:
             
             st.subheader("Result of deep analysis:")
             st.table(final_df) 
+
 
             # Download *.csv file 
             csv = convert_df_to_csv(final_df)
