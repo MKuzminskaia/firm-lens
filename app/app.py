@@ -1,28 +1,28 @@
 import streamlit as st
 import pandas as pd
 import json as js
+import os
 
 from core.models import Company
 from core.services import WikidataService, ScorerService
-from core.utils import clean_str, rules_to_str, rules_parser, convert_df_to_csv
+from core.utils import clean_str, convert_df_to_csv, load_rules, save_rules
+
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        min-width: 300px;
+        max-width: 300px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 st.title("0.6 Layer")
 st.header("Firm-Lens")
 
-#uploaded_file = st.file_uploader("Upload data", type="csv")
-
-POS_RULES = {
-    "medical": 30,
-    "health": 25,
-    "clinic": 20,
-    "ai": 10,
-    "internet": 10,
-}
-
-NEG_RULES = {
-    "gambling": -100,
-    "adult": -100,
-}
 
 ENRICH = {
     "enriched_description": "...",
@@ -49,11 +49,6 @@ COMPANY_LIST_FOR_ENRICHING = [
     }
 ]
 
-# session_state default values
-if "pos_rules" not in st.session_state: 
-    st.session_state.pos_rules = POS_RULES.copy()
-if "neg_rules" not in st.session_state:
-    st.session_state.neg_rules = NEG_RULES.copy()
 if "enrich" not in st.session_state:
     st.session_state.enrich = ENRICH.copy()
 # information entered into input fields
@@ -73,24 +68,67 @@ final_company_list : list[Company] = []
 
 
 # sidebar with rules for scoring
-with st.sidebar:
-    txt_pos = st.text_area(
-        "Write positive rules:",
-        rules_to_str(st.session_state["pos_rules"]),
-        height="content"
-    )
-    txt_neg = st.text_area(
-        "Write negative rules:",
-        rules_to_str(st.session_state["neg_rules"]),
-        height="content"
-    )
-    apply = st.button(
-        label="Apply"
-    )
 
-    if apply: 
-        st.session_state["pos_rules"] = rules_parser(txt_pos)
-        st.session_state["neg_rules"] = rules_parser(txt_neg)
+if 'rules_initialized' not in st.session_state:
+    data = load_rules()
+    st.session_state.pos_rules_list = data["pos"]
+    st.session_state.neg_rules_list = data["neg"]
+    st.session_state.rules_initialized = True
+
+
+with st.sidebar:
+    #st.subheader("Scoring Rules Configuration")
+    with st.expander("Scoring Rules Configuration", expanded = False):
+        st.markdown("Positive rules:")
+        edited_pos = st.data_editor(
+            st.session_state.pos_rules_list,
+            num_rows="dynamic",
+            key = "pos_editor",
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+            "Keyword": st.column_config.TextColumn("Keyword", help="Word to find", required=True),
+            "Points": st.column_config.NumberColumn("Points", help="Score for this word", format="%d")
+        }
+        )
+
+        pos_rules_dict = [
+            {
+                "Keyword" : row["Keyword"],
+                "Points" : abs(row["Points"]) if str(row.get("Points")).isdigit() else 0
+            }
+
+            for row in edited_pos 
+            if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
+        
+        ]
+
+        st.markdown("Negative rules:")
+        edited_neg = st.data_editor(
+            st.session_state.neg_rules_list,
+            num_rows="dynamic",
+            key = "neg_editor",
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+            "Keyword": st.column_config.TextColumn("Keyword", help="Word to find", required=True),
+            "Points": st.column_config.NumberColumn("Points", help="Score for this word", format="%d")
+        }
+        )
+
+        neg_rules_dict = [
+            {
+                "Keyword" : row["Keyword"],
+                "Points" : -abs(row["Points"]) if str(row.get("Points")).lstrip("-").isdigit() else 0
+            }
+
+            for row in edited_neg 
+            if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
+        
+        ]
+
+        if st.button("Save Rules", key="btn_save_rules"):
+            save_rules(pos_rules_dict, neg_rules_dict) 
 
 # menu for company info entering
 company_name = clean_str(st.text_input("Company name: ", "Google inc"))
