@@ -17,7 +17,7 @@ class WikidataService:
     def search_companies(self, company_name :str, website: str, country: str) -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
-        result_info = []
+        result_info : dict [str, Company] = {}
 
         if not company_name:
             raise ValueError("Company Name is empty")
@@ -43,21 +43,25 @@ class WikidataService:
                 data = response.json()
                 results = data.get('results', {}).get('bindings', [])
 
-                if results:
-                    for res in results:
-                        one_company_result : Company = Company(
-                            company_id = res.get('item', {}).get('value', "N/A"),
-                            company_name = res.get('itemLabel', {}).get('value', "N/A"),
-                            website = res.get('website', {}).get('value', "N/A"),
-                            country = res.get('countryLabel', {}).get('value', "N/A"),
-                            industry = res.get('industryLabel', {}).get('value', "N/A")
-                        )
 
-                        result_info.append(one_company_result)
+                for res in results:
+                    one_company_result : Company = Company(
+                        company_id = res.get('item', {}).get('value', "N/A"),
+                        company_name = res.get('itemLabel', {}).get('value', "N/A"),
+                        website = res.get('website', {}).get('value', "N/A"),
+                        country = res.get('countryLabel', {}).get('value', "N/A"),
+                        industry = [res.get('industryLabel', {}).get('value', "N/A")]
+                    )
+                    
+                    if one_company_result.company_id not in result_info:
+                        result_info[one_company_result.company_id] = one_company_result
+                    else:
+                        if one_company_result.industry[0] != "N/A" and one_company_result.industry[0] not in result_info[one_company_result.company_id].industry:
+                            result_info[one_company_result.company_id].industry.append(one_company_result.industry[0])
             except Exception as e:
                 #st.error(f"Error enriching {company_name}: {e}") 
                 pass
-        return result_info
+        return list(result_info.values())
 
 
     # returns the enriched list of one company by id 

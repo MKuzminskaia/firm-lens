@@ -51,23 +51,23 @@ COMPANY_LIST_FOR_ENRICHING = [
 
 # session_state default values
 if "pos_rules" not in st.session_state: 
-    st.session_state["pos_rules"] = POS_RULES.copy()
+    st.session_state.pos_rules = POS_RULES.copy()
 if "neg_rules" not in st.session_state:
-    st.session_state["neg_rules"] = NEG_RULES.copy()
+    st.session_state.neg_rules = NEG_RULES.copy()
 if "enrich" not in st.session_state:
-    st.session_state["enrich"] = ENRICH.copy()
+    st.session_state.enrich = ENRICH.copy()
 # information entered into input fields
 if "search_info" not in st.session_state:
-    st.session_state["search_info"] = SEARCH_INFO.copy()
+    st.session_state.search_info = SEARCH_INFO.copy()
 # list of searching companies by name and another parameters    
 if "founded_list_of_companies" not in st.session_state:
-    st.session_state['founded_list_of_companies'] = ['']
+    st.session_state.founded_list_of_companies = ['']
 # one selected current firm   
 if "selected_companies_for_enriching" not in st.session_state:
-    st.session_state['selected_companies_for_enriching'] = ''
+    st.session_state.selected_companies_for_enriching = ''
 # Finaly list of companies    
 if "company_list_for_enriching" not in st.session_state:
-    st.session_state['company_list_for_enriching'] = []
+    st.session_state.company_list_for_enriching = []
 
 
 
@@ -213,11 +213,3 @@ if st.session_state['company_list_for_enriching']:
 
     except Exception as e:
         st.write(e)
-
-
-
-
-#else: 
-#    st.info("No file yet")
-
-
