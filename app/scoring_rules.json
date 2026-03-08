@@ -1,0 +1,1 @@
+{"pos": [{"Keyword": "medical", "Points": 10}, {"Keyword": "health", "Points": 20}, {"Keyword": "clinic", "Points": 10}, {"Keyword": "ai", "Points": 15}, {"Keyword": "internet", "Points": 5}, {"Keyword": "information", "Points": 20}], "neg": [{"Keyword": "gambling", "Points": -80}, {"Keyword": "adult", "Points": -100}, {"Keyword": "television", "Points": -60}]}

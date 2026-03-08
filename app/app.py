@@ -20,7 +20,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("0.6 Layer")
+st.title("0.7 Layer")
 st.header("Firm-Lens")
 
 
@@ -103,6 +103,8 @@ with st.sidebar:
         
         ]
 
+        st.session_state.pos_rules_list = pos_rules_dict
+
         st.markdown("Negative rules:")
         edited_neg = st.data_editor(
             st.session_state.neg_rules_list,
@@ -127,13 +129,16 @@ with st.sidebar:
         
         ]
 
+        st.session_state.neg_rules_list = neg_rules_dict
+
         if st.button("Save Rules", key="btn_save_rules"):
             save_rules(pos_rules_dict, neg_rules_dict) 
 
 # menu for company info entering
-company_name = clean_str(st.text_input("Company name: ", "Google inc"))
-website = st.text_input("website: ", "https://")
-country = st.text_input("Country: ")
+company_name = clean_str(st.text_input("Enter the company name: ", "Google inc"))
+st.write("Please enter additional information if necessary.")
+website = st.text_input("Enter the company website : ", "https://")
+country = st.text_input("Enter the company country: ")
 
 search_info = {
     'company_name' : company_name,  
@@ -156,6 +161,16 @@ if st.button("Submit", key = 'btn_submit_to_search_company'):
     except Exception as e:
         st.write(e)
 
+
+
+selected_rows = []
+choosen_row = {}
+choosen_rows = []
+enriched_data = []
+if st.session_state['company_list_for_enriching']:
+    enriched_data = st.session_state['company_list_for_enriching']
+        
+
 # choosing columns for scoring 
 table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
 table_columns_name = st.multiselect(
@@ -168,23 +183,15 @@ st.session_state['table_columns_name'] = table_columns_name
 if not table_columns_name:
     st.error("Choose at least one column name for further work")
 
-selected_rows = []
-choosen_row = {}
-choosen_rows = []
-enriched_data = []
-if st.session_state['company_list_for_enriching']:
-    enriched_data = st.session_state['company_list_for_enriching']
-    
-
 
 # enriching list of new selected companies
 if 'founded_list_of_companies' in st.session_state:
     df = pd.DataFrame(st.session_state['founded_list_of_companies'])
     s = st.dataframe(df, 
-             selection_mode="multi-row", 
-             on_select="rerun", 
-             column_config = {'company_id' : None}
-             )
+            selection_mode="multi-row", 
+            on_select="rerun", 
+            column_config = {'company_id' : None}
+            )
     
     selected_rows = s['selection']['rows']
     
@@ -197,12 +204,13 @@ if 'founded_list_of_companies' in st.session_state:
                 enriched_data.append(new_data)
             st.session_state['company_list_for_enriching'] = enriched_data    
 
+
 # generating final table (enriched with scoring)
 if st.session_state['company_list_for_enriching']:
     try:
-
+        
         final_df = pd.DataFrame(enriched_data)
-
+        
         if not table_columns_name:
             table_columns_name = st.session_state['table_columns_name']
         final_df[['score', 'reasons']] = (
@@ -210,7 +218,7 @@ if st.session_state['company_list_for_enriching']:
             .fillna("")
             .astype(str)
             .agg(" ".join , axis=1)
-            .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules, st.session_state.neg_rules))
+            .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
             .apply(pd.Series))
 
         if enriched_data:     
