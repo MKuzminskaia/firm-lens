@@ -56,9 +56,15 @@ class WikidataService:
             query = f"""
                     SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
                         VALUES ?item {{ {id_list} }}
-                        ?item wdt:P31/wdt:P279* wd:Q4830453 . 
-                        OPTIONAL {{ ?item wdt:P856 ?website. }}
-                        OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
+                        ?item wdt:P31/wdt:P279* wd:Q4830453 . """
+            
+            if website.strip() and website.strip() != 'https://':
+                st.write(website)
+                query += f"?item wdt:P856 <{website}> . "
+                query += f"BIND(<{website}> AS ?website) "  
+            else:
+                query += "OPTIONAL { ?item wdt:P856 ?website . } "
+            query += f"""OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
                         OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
                         SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
                     }}

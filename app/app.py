@@ -137,12 +137,12 @@ with st.sidebar:
 # menu for company info entering
 company_name = clean_str(st.text_input("Enter the company name: ", "Google inc"))
 st.write("Please enter additional information if necessary.")
-website = st.text_input("Enter the company website : ", "https://")
+website = st.text_input("Enter the company website : ", "https://about.google/")
 country = st.text_input("Enter the company country: ")
 
 search_info = {
     'company_name' : company_name,  
-    'Website' : website,  
+    'website' : website,  
     'country' : country
 }
 
@@ -151,10 +151,21 @@ results_df = pd.DataFrame([search_info])
 if "wiki_service" not in st.session_state: 
     st.session_state.wiki_service = WikidataService()
 
+
+# analyzing file 
+column: str
+uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
+if uploaded_file is not None:
+    results = pd.read_csv(uploaded_file, sep= ';')
+    table_columns = results.columns
+    column = st.selectbox("Select column with company name information for searching:",
+                          table_columns)
+    
+
 # searching companies based on entered data
-if st.button("Submit", key = 'btn_submit_to_search_company'):
+if st.button("Submit", key = 'btn_submit_to_search_company') or (uploaded_file and column):
     try:
-        final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], '', '')
+        final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], '')
         data_for_table = [rare.to_dict() for rare in final_company_list]
         results_df = pd.DataFrame(data_for_table)
         st.session_state['founded_list_of_companies'] = data_for_table
@@ -185,7 +196,7 @@ if not table_columns_name:
 
 
 # enriching list of new selected companies
-if 'founded_list_of_companies' in st.session_state:
+if 'founded_list_of_companies' in st.session_state :
     df = pd.DataFrame(st.session_state['founded_list_of_companies'])
     s = st.dataframe(df, 
             selection_mode="multi-row", 
@@ -195,7 +206,7 @@ if 'founded_list_of_companies' in st.session_state:
     
     selected_rows = s['selection']['rows']
     
-    if st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and selected_rows:
+    if (st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') or (uploaded_file and column)) and selected_rows:
         
         with st.spinner("Searching data in Wikidata..."):
             for row_number in selected_rows:
