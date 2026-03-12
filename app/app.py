@@ -62,7 +62,7 @@ if "selected_companies_for_enriching" not in st.session_state:
     st.session_state.selected_companies_for_enriching = ''
 # Finaly list of companies    
 if "company_list_for_enriching" not in st.session_state:
-    st.session_state.company_list_for_enriching = []
+    st.session_state.company_list_for_enriching = []                            
 
 final_company_list : list[Company] = []
 
@@ -134,80 +134,108 @@ with st.sidebar:
         if st.button("Save Rules", key="btn_save_rules"):
             save_rules(pos_rules_dict, neg_rules_dict) 
 
-# menu for company info entering
-company_name = clean_str(st.text_input("Enter the company name: ", "Google inc"))
-st.write("Please enter additional information if necessary.")
-website = st.text_input("Enter the company website : ", "https://about.google/")
-country = st.text_input("Enter the company country: ")
 
-search_info = {
-    'company_name' : company_name,  
-    'website' : website,  
-    'country' : country
-}
+st.write("Select the method for selecting a list of companies:")
 
-results_df = pd.DataFrame([search_info])
+col1, col2 = st.columns(2)
+with col1: 
+    # menu for company info entering
+    with st.container(border=True):
+        company_name = clean_str(st.text_input("\* Enter the company name: ", "Google inc"))
+        website = st.text_input("Enter the company website : ", "https://about.google/")
+        country = st.text_input("Enter the company country: ")
 
-if "wiki_service" not in st.session_state: 
-    st.session_state.wiki_service = WikidataService()
+        search_info = {
+            'company_name' : company_name,  
+            'website' : website,  
+            'country' : country
+        }
 
+        results_df = pd.DataFrame([search_info])
 
-# analyzing file 
-column: str
-uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
-if uploaded_file is not None:
-    results = pd.read_csv(uploaded_file, sep= ';')
-    table_columns = results.columns
-    column = st.selectbox("Select column with company name information for searching:",
-                          table_columns)
-    
-
-# searching companies based on entered data
-if st.button("Submit", key = 'btn_submit_to_search_company') or (uploaded_file and column):
-    try:
-        final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], '')
-        data_for_table = [rare.to_dict() for rare in final_company_list]
-        results_df = pd.DataFrame(data_for_table)
-        st.session_state['founded_list_of_companies'] = data_for_table
-    except Exception as e:
-        st.write(e)
-
-
-
-selected_rows = []
-choosen_row = {}
-choosen_rows = []
-enriched_data = []
-if st.session_state['company_list_for_enriching']:
-    enriched_data = st.session_state['company_list_for_enriching']
+        if "wiki_service" not in st.session_state: 
+            st.session_state.wiki_service = WikidataService()
         
+        if st.button("Submit", key = 'btn_search_company_by_name'):
+            try:
+                final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], '')
+                data_for_table = [rare.to_dict() for rare in final_company_list]
+                results_df = pd.DataFrame(data_for_table)
+                st.session_state['founded_list_of_companies'] = data_for_table
+            except Exception as e:
+                st.write(e)   
 
-# choosing columns for scoring 
-table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
-table_columns_name = st.multiselect(
-    "Select column name of table for enriching: ",
-    table_columns,
-)
-st.session_state['table_columns_name'] = table_columns_name
+with col2:  
+    # analyzing file 
+    with st.container(border=True):
+        column: str
+        uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
+        if uploaded_file is not None:
+            results = pd.read_csv(uploaded_file, sep= ';')
+            table_columns = results.columns
 
+            st.session_state['founded_list_of_companies_from_file'] = results.to_dict(orient='records')
 
-if not table_columns_name:
-    st.error("Choose at least one column name for further work")
+            with st.expander("Downloaded info from file"):
+                st.dataframe(st.session_state.founded_list_of_companies_from_file)
 
-
-# enriching list of new selected companies
-if 'founded_list_of_companies' in st.session_state :
-    df = pd.DataFrame(st.session_state['founded_list_of_companies'])
-    s = st.dataframe(df, 
-            selection_mode="multi-row", 
-            on_select="rerun", 
-            column_config = {'company_id' : None}
-            )
-    
-    selected_rows = s['selection']['rows']
-    
-    if (st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') or (uploaded_file and column)) and selected_rows:
+            column = st.selectbox("Select column with company name id for searching:",
+                                table_columns)
+            
         
+        # if st.button("Submit", key = 'btn_search_company_from_File'):
+        
+        #     if uploaded_file and column:
+        #         try:
+        #             companies_names = results[column]
+        #             for company in companies_names:
+        #                 company_info = st.session_state.wiki_service.search_companies(company, '', '')
+        #                 final_company_list.append(company_info[0])  
+        #             data_for_table = [rare.to_dict() for rare in final_company_list]
+        #             results_df = pd.DataFrame(data_for_table)
+        #             st.session_state['founded_list_of_companies'] = data_for_table
+        #             st.success('File downloaded')
+        #         except Exception as e:
+        #             st.write(e)
+
+
+
+
+with st.container(border=True):
+    selected_rows = []
+    # enriching list of new selected companies
+    if 'founded_list_of_companies' in st.session_state:
+        df = pd.DataFrame(st.session_state['founded_list_of_companies'])
+        s = st.dataframe(df, 
+                selection_mode="multi-row", 
+                on_select="rerun", 
+                column_config = {'company_id' : None}
+                )
+        selected_rows = s['selection']['rows']
+    
+    if 'founded_list_of_companies_from_file' in st.session_state:
+        df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
+        
+        for i in range( len(df)):
+            selected_rows.append(i)   
+
+
+    # choosing columns for scoring 
+    table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
+    table_columns_name = st.multiselect(
+        "Select column name of table for enriching: ",
+        table_columns,
+    )
+    st.session_state['table_columns_name'] = table_columns_name
+    
+
+    enriched_data = []
+    if st.session_state['company_list_for_enriching']:
+        enriched_data = st.session_state['company_list_for_enriching']
+
+    if not table_columns_name:
+        st.error("Choose at least one column name for further work")
+    elif st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and st.session_state['table_columns_name']: # or (uploaded_file and column)) and selected_rows:
         with st.spinner("Searching data in Wikidata..."):
             for row_number in selected_rows:
                 row = df.iloc[row_number].to_dict()  
@@ -215,39 +243,38 @@ if 'founded_list_of_companies' in st.session_state :
                 enriched_data.append(new_data)
             st.session_state['company_list_for_enriching'] = enriched_data    
 
-
-# generating final table (enriched with scoring)
-if st.session_state['company_list_for_enriching']:
-    try:
-        
-        final_df = pd.DataFrame(enriched_data)
-        
-        if not table_columns_name:
-            table_columns_name = st.session_state['table_columns_name']
-        final_df[['score', 'reasons']] = (
-            final_df[table_columns_name]
-            .fillna("")
-            .astype(str)
-            .agg(" ".join , axis=1)
-            .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
-            .apply(pd.Series))
-
-        if enriched_data:     
+    # generating final table (enriched with scoring)
+    if st.session_state['company_list_for_enriching']:
+        try:
             
-            st.subheader("Result of deep analysis:")
-            st.table(final_df) 
+            final_df = pd.DataFrame(enriched_data)
+            
+            if not table_columns_name:
+                table_columns_name = st.session_state['table_columns_name']
+            final_df[['score', 'reasons']] = (
+                final_df[table_columns_name]
+                .fillna("")
+                .astype(str)
+                .agg(" ".join , axis=1)
+                .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
+                .apply(pd.Series))
+
+            if enriched_data:     
+                
+                st.subheader("Result of deep analysis:")
+                st.table(final_df) 
 
 
-            # Download *.csv file 
-            csv = convert_df_to_csv(final_df)
-            file_name = "firm_lens_report"
-            st.download_button(
-                label = "Download CSV",
-                data = csv,
-                file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
-                mime="text/csv",
-                key='download-csv'
-            )
+                # Download *.csv file 
+                csv = convert_df_to_csv(final_df)
+                file_name = "firm_lens_report"
+                st.download_button(
+                    label = "Download CSV",
+                    data = csv,
+                    file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
+                    mime="text/csv",
+                    key='download-csv'
+                )
 
-    except Exception as e:
-        st.write(e)
+        except Exception as e:
+            st.write(e)

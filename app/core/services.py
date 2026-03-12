@@ -59,7 +59,6 @@ class WikidataService:
                         ?item wdt:P31/wdt:P279* wd:Q4830453 . """
             
             if website.strip() and website.strip() != 'https://':
-                st.write(website)
                 query += f"?item wdt:P856 <{website}> . "
                 query += f"BIND(<{website}> AS ?website) "  
             else:
