@@ -3,7 +3,7 @@ import pandas as pd
 import json as js
 import os
 
-from core.models import Company
+from core.models import Company, SearchMode
 from core.services import WikidataService, ScorerService
 from core.utils import clean_str, convert_df_to_csv, load_rules, save_rules
 
@@ -20,24 +20,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("0.7 Layer")
+st.title("0.8 Layer")
 st.header("Firm-Lens")
 
 
-ENRICH = {
-    "enriched_description": "...",
-    "enriched_website": "...",
-    "enriched_country": "...",
-    "enriched_industry": "...",
-    "enrich_status": "not_found",  # "hit" | "not_found" | "error",
-    "enrich_source": "wikidata"
-}
+# Default State
+#--------------------------------------------------------------------------------------------------------
 
-SEARCH_INFO = {
-    'company_name' : 'empty',  
-    'website' : 'empty',  
-    'country' : 'empty'
-}
+rules_data = load_rules()   # loading scoring rules from file if it exists
+
+if 'initial_check' not in st.session_state:
+    st.session_state.pos_rules_list = rules_data["pos"]     # positive rules initialisation
+    st.session_state.neg_rules_list = rules_data["neg"]     # negative rules initialisation
+
+    st.session_state.wiki_service = WikidataService()       # WikidataService inicialisation (for searching and enriching)
+
+    st.session_state.founded_list_of_companies = ['']       # list of searching companies by name and another parameters
+    st.session_state.company_list_for_enriching = []        # Finaly list of companies  
+    st.session_state.enrichment_columns = []                # Columns names for enriching 
+
+    st.session_state.initial_check = True                   # Flag we initialised main variables
+
+    st.session_state.founded_list_of_companies_from_file = dict()  #
+
+    st.session_state.search_mode = SearchMode.NOT_DEFINED   # Search mode : individual or by file
 
 COMPANY_LIST_FOR_ENRICHING = [
     {
@@ -48,38 +54,18 @@ COMPANY_LIST_FOR_ENRICHING = [
         'industry' : 'empty',
     }
 ]
-
-if "enrich" not in st.session_state:
-    st.session_state.enrich = ENRICH.copy()
-# information entered into input fields
-if "search_info" not in st.session_state:
-    st.session_state.search_info = SEARCH_INFO.copy()
-# list of searching companies by name and another parameters    
-if "founded_list_of_companies" not in st.session_state:
-    st.session_state.founded_list_of_companies = ['']
-# one selected current firm   
-if "selected_companies_for_enriching" not in st.session_state:
-    st.session_state.selected_companies_for_enriching = ''
-# Finaly list of companies    
-if "company_list_for_enriching" not in st.session_state:
-    st.session_state.company_list_for_enriching = []                            
+                               
 
 final_company_list : list[Company] = []
 
 
 # sidebar with rules for scoring
-
-if 'rules_initialized' not in st.session_state:
-    data = load_rules()
-    st.session_state.pos_rules_list = data["pos"]
-    st.session_state.neg_rules_list = data["neg"]
-    st.session_state.rules_initialized = True
-
-
+#--------------------------------------------------------------------------------------------------------
 with st.sidebar:
-    #st.subheader("Scoring Rules Configuration")
     with st.expander("Scoring Rules Configuration", expanded = False):
         st.markdown("Positive rules:")
+
+        # Table of positive rules 
         edited_pos = st.data_editor(
             st.session_state.pos_rules_list,
             num_rows="dynamic",
@@ -91,20 +77,8 @@ with st.sidebar:
             "Points": st.column_config.NumberColumn("Points", help="Score for this word", format="%d")
         }
         )
-
-        pos_rules_dict = [
-            {
-                "Keyword" : row["Keyword"],
-                "Points" : abs(row["Points"]) if str(row.get("Points")).isdigit() else 0
-            }
-
-            for row in edited_pos 
-            if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
         
-        ]
-
-        st.session_state.pos_rules_list = pos_rules_dict
-
+        # Table of negative rules
         st.markdown("Negative rules:")
         edited_neg = st.data_editor(
             st.session_state.neg_rules_list,
@@ -118,21 +92,29 @@ with st.sidebar:
         }
         )
 
-        neg_rules_dict = [
-            {
-                "Keyword" : row["Keyword"],
-                "Points" : -abs(row["Points"]) if str(row.get("Points")).lstrip("-").isdigit() else 0
-            }
-
-            for row in edited_neg 
-            if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
-        
-        ]
-
-        st.session_state.neg_rules_list = neg_rules_dict
-
+        # save changed rules to file and in session_state
         if st.button("Save Rules", key="btn_save_rules"):
-            save_rules(pos_rules_dict, neg_rules_dict) 
+            pos_rules_list = [
+                {
+                    "Keyword" : row["Keyword"],
+                    "Points" : abs(row["Points"]) if str(row.get("Points")).isdigit() else 0
+                }
+                for row in edited_pos 
+                if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
+            ]
+
+            neg_rules_list = [
+                {
+                    "Keyword" : row["Keyword"],
+                    "Points" : -abs(row["Points"]) if str(row.get("Points")).lstrip("-").isdigit() else 0
+                }
+                for row in edited_neg 
+                if isinstance(row, dict) and row.get("Keyword") and row.get("Keyword") != '' and row.get("Points") != 'NaN'
+            ]
+
+            save_rules(pos_rules_list, neg_rules_list) 
+            st.session_state.pos_rules_list = pos_rules_list
+            st.session_state.neg_rules_list = neg_rules_list
 
 
 st.write("Select the method for selecting a list of companies:")
@@ -141,8 +123,8 @@ col1, col2 = st.columns(2)
 with col1: 
     # menu for company info entering
     with st.container(border=True):
-        company_name = clean_str(st.text_input("\* Enter the company name: ", "Google inc"))
-        website = st.text_input("Enter the company website : ", "https://about.google/")
+        company_name = clean_str(st.text_input("\* Enter the company name: ", placeholder="ex. Google inc"))
+        website = st.text_input("Enter the company website : ", "https://", placeholder="ex. https://about.google/")
         country = st.text_input("Enter the company country: ")
 
         search_info = {
@@ -152,9 +134,6 @@ with col1:
         }
 
         results_df = pd.DataFrame([search_info])
-
-        if "wiki_service" not in st.session_state: 
-            st.session_state.wiki_service = WikidataService()
         
         if st.button("Submit", key = 'btn_search_company_by_name'):
             try:
@@ -162,11 +141,12 @@ with col1:
                 data_for_table = [rare.to_dict() for rare in final_company_list]
                 results_df = pd.DataFrame(data_for_table)
                 st.session_state['founded_list_of_companies'] = data_for_table
+                st.session_state.search_mode = SearchMode.INDIVIDUAL
             except Exception as e:
                 st.write(e)   
 
 with col2:  
-    # analyzing file 
+    # analyzing file and selecting enriching parameters
     with st.container(border=True):
         column: str
         uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
@@ -179,102 +159,111 @@ with col2:
             with st.expander("Downloaded info from file"):
                 st.dataframe(st.session_state.founded_list_of_companies_from_file)
 
-            column = st.selectbox("Select column with company name id for searching:",
+            file_column_name = st.selectbox("Select column with company name id for searching:",
                                 table_columns)
             
-        
-        # if st.button("Submit", key = 'btn_search_company_from_File'):
-        
-        #     if uploaded_file and column:
-        #         try:
-        #             companies_names = results[column]
-        #             for company in companies_names:
-        #                 company_info = st.session_state.wiki_service.search_companies(company, '', '')
-        #                 final_company_list.append(company_info[0])  
-        #             data_for_table = [rare.to_dict() for rare in final_company_list]
-        #             results_df = pd.DataFrame(data_for_table)
-        #             st.session_state['founded_list_of_companies'] = data_for_table
-        #             st.success('File downloaded')
-        #         except Exception as e:
-        #             st.write(e)
-
-
-
-
-with st.container(border=True):
-    selected_rows = []
-    # enriching list of new selected companies
-    if 'founded_list_of_companies' in st.session_state:
-        df = pd.DataFrame(st.session_state['founded_list_of_companies'])
-        s = st.dataframe(df, 
-                selection_mode="multi-row", 
-                on_select="rerun", 
-                column_config = {'company_id' : None}
-                )
-        selected_rows = s['selection']['rows']
-    
-    if 'founded_list_of_companies_from_file' in st.session_state:
-        df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
-        
-        for i in range( len(df)):
-            selected_rows.append(i)   
-
-
-    # choosing columns for scoring 
-    table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
-    table_columns_name = st.multiselect(
-        "Select column name of table for enriching: ",
-        table_columns,
-    )
-    st.session_state['table_columns_name'] = table_columns_name
-    
-
-    enriched_data = []
-    if st.session_state['company_list_for_enriching']:
-        enriched_data = st.session_state['company_list_for_enriching']
-
-    if not table_columns_name:
-        st.error("Choose at least one column name for further work")
-    elif st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and st.session_state['table_columns_name']: # or (uploaded_file and column)) and selected_rows:
-        with st.spinner("Searching data in Wikidata..."):
-            for row_number in selected_rows:
-                row = df.iloc[row_number].to_dict()  
-                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                enriched_data.append(new_data)
-            st.session_state['company_list_for_enriching'] = enriched_data    
-
-    # generating final table (enriched with scoring)
-    if st.session_state['company_list_for_enriching']:
-        try:
+            file_columns_enrich = st.multiselect("Select column names for enriching: ",
+                                table_columns)
+            st.session_state.enrichment_columns = file_columns_enrich
             
-            final_df = pd.DataFrame(enriched_data)
-            
-            if not table_columns_name:
-                table_columns_name = st.session_state['table_columns_name']
-            final_df[['score', 'reasons']] = (
-                final_df[table_columns_name]
-                .fillna("")
-                .astype(str)
-                .agg(" ".join , axis=1)
-                .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
-                .apply(pd.Series))
+            if (file_columns_enrich): dis_button = False
+            else: dis_button = True
 
-            if enriched_data:     
+            if st.button(
+                label="Quick search",
+                key="quick_search_by_file",
+                disabled = dis_button
+            ): st.session_state.search_mode = SearchMode.BY_FILE            # further enrichment is carried out according to the file data
+            
+# if the request is defined
+if st.session_state.search_mode != SearchMode.NOT_DEFINED:  
+    with st.container(border=True):
+        selected_rows = []
+        # enriching list of new selected companies in INDIVIDUAL search mode
+        if st.session_state.search_mode == SearchMode.INDIVIDUAL and 'founded_list_of_companies' in st.session_state:
+            df = pd.DataFrame(st.session_state['founded_list_of_companies'])
+            s = st.dataframe(df, 
+                    selection_mode="multi-row", 
+                    on_select="rerun", 
+                    column_config = {'company_id' : None}
+                    )
+            selected_rows = s['selection']['rows']
+        
+
+        # enriching list of companies in BY_FILE search mode
+        if st.session_state.search_mode == SearchMode.BY_FILE and 'founded_list_of_companies_from_file' in st.session_state:
+            df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
+            for i in range( len(df)):
+                selected_rows.append(i)   
+
+
+        if st.session_state.search_mode == SearchMode.INDIVIDUAL:
+            # choosing columns for enriching 
+        
+            table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
+            enrichment_columns = st.multiselect(
+                "Select column name of table for enriching: ",
+                table_columns,
+            )
+            st.session_state['enrichment_columns'] = enrichment_columns
+            
+
+            enriched_data = []
+            enriched_data = st.session_state['company_list_for_enriching']
+
+            if not enrichment_columns:
+                st.error("Choose at least one column name for further work")
+            elif st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and st.session_state['enrichment_columns']:
+                with st.spinner("Searching data in Wikidata..."):
+                    for row_number in selected_rows:
+                        row = df.iloc[row_number].to_dict()  
+                        new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                        enriched_data.append(new_data)
+                    st.session_state['company_list_for_enriching'] = enriched_data    
+
+        if st.session_state.search_mode == SearchMode.BY_FILE:
+            
+            enriched_data = []
+            enriched_data = st.session_state['company_list_for_enriching']
+
+            with st.spinner("Searching data in Wikidata..."):
+                for row_number in selected_rows:
+                    row = df.iloc[row_number].to_dict()  
+                    new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                    enriched_data.append(new_data)
+                st.session_state['company_list_for_enriching'] = enriched_data    
+
+        # generating final table with scoring
+        if st.session_state['company_list_for_enriching']:
+            try:
                 
-                st.subheader("Result of deep analysis:")
-                st.table(final_df) 
+                final_df = pd.DataFrame(enriched_data)
+                
+                enrichment_columns = st.session_state['enrichment_columns']
+                final_df[['score', 'reasons']] = (
+                    final_df[enrichment_columns]
+                    .fillna("")
+                    .astype(str)
+                    .agg(" ".join , axis=1)
+                    .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
+                    .apply(pd.Series))
+
+                if enriched_data:     
+                    
+                    st.subheader("Result of deep analysis:")
+                    st.table(final_df) 
 
 
-                # Download *.csv file 
-                csv = convert_df_to_csv(final_df)
-                file_name = "firm_lens_report"
-                st.download_button(
-                    label = "Download CSV",
-                    data = csv,
-                    file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
-                    mime="text/csv",
-                    key='download-csv'
-                )
+                    # Download *.csv file 
+                    csv = convert_df_to_csv(final_df)
+                    file_name = "firm_lens_report"
+                    st.download_button(
+                        label = "Download CSV",
+                        data = csv,
+                        file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
+                        mime="text/csv",
+                        key='download-csv'
+                    )
 
-        except Exception as e:
-            st.write(e)
+            except Exception as e:
+                st.write(e)
