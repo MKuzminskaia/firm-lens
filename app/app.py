@@ -77,8 +77,18 @@ def final_result():
             if enriched_data:     
                 
                 st.subheader("Result of deep analysis:")
-                st.table(final_df) 
-
+                #st.table(final_df) 
+                st.dataframe(final_df,
+                             column_config={
+                                "company_id" : None,
+                                "company_name": st.column_config.TextColumn("Company Name", width="medium"),
+                                "website": st.column_config.LinkColumn("Website", width="medium"),
+                                "country": st.column_config.TextColumn("Country", width="medium"),
+                                "score": st.column_config.NumberColumn("Score",),
+                                "reasons": st.column_config.TextColumn("Analysis Details", width="large")
+                                },
+                             hide_index=True,
+                             )
 
                 # Download *.csv file 
                 csv = convert_df_to_csv(final_df)
@@ -215,12 +225,18 @@ with tab1:
                     if not enrichment_columns:
                         st.error("Choose at least one column name for further work")
                     elif st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and st.session_state['enrichment_columns']:
-                        with st.spinner("Searching data in Wikidata..."):
-                            for row_number in selected_rows:
-                                row = df.iloc[row_number].to_dict()  
-                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                                enriched_data.append(new_data)
-                            st.session_state.company_list_for_enriching = enriched_data    
+                        #with st.spinner("Searching data in Wikidata..."):
+                        
+                        progress_iterator = 0
+                        my_bar = st.progress(progress_iterator, text="Enriching progress")
+                        for row_number in selected_rows:
+                            row = df.iloc[row_number].to_dict()  
+                            new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                            enriched_data.append(new_data)
+                            progress_iterator+=1
+                            my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
+                        my_bar.empty()    
+                        st.session_state.company_list_for_enriching = enriched_data    
                         final_result()
 
 
@@ -266,12 +282,18 @@ with tab2:
 
                     if st.session_state.search_mode == SearchMode.BY_FILE:
                         enriched_data = st.session_state.company_list_for_enriching
-                        with st.spinner("Searching data in Wikidata..."):
-                            for row_number in selected_rows:
-                                row = df.iloc[row_number].to_dict()  
-                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                                enriched_data.append(new_data)
-                            st.session_state.company_list_for_enriching = enriched_data  
+                        progress_iterator = 0
+                        my_bar = st.progress(progress_iterator, text="Enriching progress")
+                        #with st.spinner("Searching data in Wikidata..."):
+                        for row_number in selected_rows:
+                            row = df.iloc[row_number].to_dict()  
+                            new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                            enriched_data.append(new_data)
+                            progress_iterator+=1
+                            my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
+                            
+                        my_bar.empty()
+                        st.session_state.company_list_for_enriching = enriched_data  
                         final_result()
 
        
