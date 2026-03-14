@@ -3,6 +3,27 @@ from .models import Company
 from  core.utils import clean_str
 import streamlit as st
 
+BOOST_KEYWORDS = ['company', 
+                  'enterprise', 
+                  'business', 
+                  'corporation', 
+                  'firm', 
+                  'manufacturer', 
+                  'inc', 
+                  'gmbh'
+                  ]
+
+PENALTY_KEYWORDS = ['film', 
+                    'movie', 
+                    'song', 
+                    'album', 
+                    'single', 
+                    'human', 
+                    'person', 
+                    'biography', 
+                    'fictional'
+                    ]
+
 class WikidataService:
     def __init__(self):
         self.url = "https://query.wikidata.org/sparql"
@@ -13,8 +34,8 @@ class WikidataService:
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    #@st.cache_data
-    def search_companies(self, company_name :str, website: str, country: str) -> list[Company]: 
+    @st.cache_data() #(ttl=3600)
+    def search_companies(_self, company_name :str, website: str, country: str) -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
         result_info : dict [str, Company] = {}
@@ -35,7 +56,7 @@ class WikidataService:
         try:
             search_res = requests.get(search_url, 
                                       params=search_params, 
-                                      headers=self.headers,
+                                      headers=_self.headers,
                                       timeout=10)
             
             if search_res.status_code != 200:
@@ -54,7 +75,7 @@ class WikidataService:
             id_list = " ".join([f"wd:{i}" for i in ids])
             
             query = f"""
-                    SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
+                    SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
                         VALUES ?item {{ {id_list} }}
                         ?item wdt:P31/wdt:P279* wd:Q4830453 . """
             
@@ -69,7 +90,7 @@ class WikidataService:
                     }}
                     """
                 
-            response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=20)
+            response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=20)
             data = response.json()
             results = data.get('results', {}).get('bindings', [])
 
@@ -86,13 +107,44 @@ class WikidataService:
                         company_name=res.get('itemLabel', {}).get('value', "N/A"),
                         website=res.get('website', {}).get('value', "N/A"),
                         country=res.get('countryLabel', {}).get('value', "N/A"),
-                        industry=[ind_label] if ind_label != "N/A" else []
+                        industry=[ind_label] if ind_label != "N/A" else [],
+                        description=res.get('itemDescription', {}).get('value', 'N/A')
                     )
                 else:
                     if ind_label != "N/A" and ind_label not in companies_dict[c_id].industry:
                         companies_dict[c_id].industry.append(ind_label)
 
-            return list(companies_dict.values())
+            ranked_candidates = []
+            
+            for item in list(companies_dict.values()):
+                description = item.description.lower()
+                
+                # basic "weight" of item instead of description
+                weight = 0
+
+                for word in BOOST_KEYWORDS:
+                    if word in description:
+                        weight +=10
+
+                for word in PENALTY_KEYWORDS:
+                    if word in description:
+                        weight -=20
+
+                ranked_candidates.append({
+                    'id' : item.company_id,
+                    'weight' : weight,
+                    'company' : item
+                    }
+                )
+
+            ranked_candidates.sort(key=lambda x: x["weight"], reverse=True)
+            # if weight < 0 , dont add to result list
+            result = []
+            for item in ranked_candidates:
+                if item['weight'] >= 0:
+                    result.append(item['company'])
+                
+            return result #list(companies_dict.values())
 
         except Exception as e:
             # st.error(f"Search failed: {e}")
@@ -101,7 +153,8 @@ class WikidataService:
 
     # returns the enriched list of one company by id 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    def enrich_company(self, company_id :str, website: str, country: str) -> Company:  #-> dict [str, str]:  #-> Company:
+    @st.cache_data(ttl=3600)
+    def enrich_company(_self, company_id :str, website: str, country: str) -> Company:  #-> dict [str, str]:  #-> Company:
         company_id = company_id.strip()
 
         result_company : dict [str, Company] = {}
@@ -126,7 +179,7 @@ class WikidataService:
 
             try:
                 
-                response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=10)
+                response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=10)
                 data = response.json()
                 results = data.get('results', {}).get('bindings', [])
                 

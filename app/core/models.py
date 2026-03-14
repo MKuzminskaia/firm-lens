@@ -16,6 +16,7 @@ class Company:
     industry : list[str] = field(default_factory=list)
     score : int = 0
     reasons : str = ""
+    description : str = ""
 
     # returns dictionary of fields for Pandas
     def to_dict(self) -> dict:

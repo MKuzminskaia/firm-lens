@@ -52,6 +52,7 @@ COMPANY_LIST_FOR_ENRICHING = [
         'website' : 'empty', 
         'country' : 'empty',
         'industry' : 'empty',
+        #'description' : 'empty'
     }
 ]
                                
@@ -74,7 +75,7 @@ def final_result():
                 .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
                 .apply(pd.Series))
 
-            if enriched_data:     
+            if not final_df.empty:     
                 
                 st.subheader("Result of deep analysis:")
                 #st.table(final_df) 
@@ -88,6 +89,7 @@ def final_result():
                                 "reasons": st.column_config.TextColumn("Analysis Details", width="large")
                                 },
                              hide_index=True,
+                             use_container_width=True
                              )
 
                 # Download *.csv file 
@@ -225,14 +227,16 @@ with tab1:
                     if not enrichment_columns:
                         st.error("Choose at least one column name for further work")
                     elif st.button("Submit", key = 'btn_submit_choosen_list_for_enriching') and st.session_state['enrichment_columns']:
-                        #with st.spinner("Searching data in Wikidata..."):
                         
                         progress_iterator = 0
                         my_bar = st.progress(progress_iterator, text="Enriching progress")
                         for row_number in selected_rows:
-                            row = df.iloc[row_number].to_dict()  
-                            new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                            enriched_data.append(new_data)
+                            try:
+                                row = df.iloc[row_number].to_dict()  
+                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                                enriched_data.append(new_data)
+                            except Exception as e:
+                                st.warning(e)
                             progress_iterator+=1
                             my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
                         my_bar.empty()    
@@ -284,11 +288,13 @@ with tab2:
                         enriched_data = st.session_state.company_list_for_enriching
                         progress_iterator = 0
                         my_bar = st.progress(progress_iterator, text="Enriching progress")
-                        #with st.spinner("Searching data in Wikidata..."):
                         for row_number in selected_rows:
-                            row = df.iloc[row_number].to_dict()  
-                            new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                            enriched_data.append(new_data)
+                            try:
+                                row = df.iloc[row_number].to_dict()  
+                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
+                                enriched_data.append(new_data)
+                            except Exception as e:
+                                st.warning(e)
                             progress_iterator+=1
                             my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
                             
