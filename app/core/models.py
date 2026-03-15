@@ -14,9 +14,9 @@ class Company:
     website : str = 'N/A'
     country : str = 'N/A'
     industry : list[str] = field(default_factory=list)
+    description : str = ''
     score : int = 0
-    reasons : str = ""
-    description : str = ""
+    reasons : str = ''
 
     # returns dictionary of fields for Pandas
     def to_dict(self) -> dict:

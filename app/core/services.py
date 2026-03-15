@@ -163,7 +163,7 @@ class WikidataService:
             raise ValueError("Company Name is empty")
         else: 
             company_id = company_id.split('/')[-1]
-            query = f"""SELECT DISTINCT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
+            query = f"""SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
                     BIND(wd:{company_id} AS ?item) ."""
             if website:
                 query += f"""?item wdt:P856 "<{website}>" ."""    
@@ -190,7 +190,8 @@ class WikidataService:
                         company_id = results[0].get('item', {}).get('value', "N/A"),
                         company_name = results[0].get('itemLabel', {}).get('value', "N/A"),
                         website = results[0].get('website', {}).get('value', "N/A"),
-                        country = results[0].get('countryLabel', {}).get('value', "N/A")
+                        country = results[0].get('countryLabel', {}).get('value', "N/A"),
+                        description= results[0].get('itemDescription', {}).get('value', "N/A")
                     )
                     
                     for res in results:

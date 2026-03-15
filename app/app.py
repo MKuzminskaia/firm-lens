@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json as js
+from dataclasses import fields
 import os
 
 from core.models import Company, SearchMode
@@ -227,7 +228,12 @@ with tab1:
                 if st.session_state.search_mode == SearchMode.INDIVIDUAL:
                 # choosing columns for enriching 
             
-                    table_columns = COMPANY_LIST_FOR_ENRICHING[0].keys()
+                    table_columns = [f.name for f in fields(Company)]
+                    if 'score' in table_columns:
+                        table_columns.remove('score')
+                    if 'reasons' in table_columns:
+                        table_columns.remove('reasons')
+                    
                     enrichment_columns = st.multiselect(
                         "Select column name of table for enriching: ",
                         table_columns,
@@ -262,7 +268,13 @@ with tab2:
         uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
         if uploaded_file is not None:
             results = pd.read_csv(uploaded_file, sep=None, engine='python')
-            table_columns = results.columns
+            
+            table_columns = [f.name for f in fields(Company)]
+            if 'score' in table_columns:
+                table_columns.remove('score')
+            if 'reasons' in table_columns:
+                table_columns.remove('reasons')
+                    
 
             st.session_state['founded_list_of_companies_from_file'] = results.to_dict(orient='records')
 
