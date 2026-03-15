@@ -5,7 +5,7 @@ import os
 
 from core.models import Company, SearchMode
 from core.services import WikidataService, ScorerService
-from core.utils import clean_str, convert_df_to_csv, load_rules, save_rules
+from core.utils import clean_str, convert_df_to_csv, load_rules, save_rules, convert_df_to_excel
 
 
 st.markdown(
@@ -20,7 +20,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("0.8 Layer")
+st.title("0.9 Layer")
 st.header("Firm-Lens")
 
 
@@ -92,16 +92,27 @@ def final_result():
                              use_container_width=True
                              )
 
-                # Download *.csv file 
-                csv = convert_df_to_csv(final_df)
-                file_name = "firm_lens_report"
-                st.download_button(
-                    label = "Download CSV",
-                    data = csv,
-                    file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
-                    mime="text/csv",
-                    key='download-csv'
-                )
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Download *.csv file 
+                    csv = convert_df_to_csv(final_df)
+                    file_name = "firm_lens_report"
+                    st.download_button(
+                        label = "Download CSV",
+                        data = csv,
+                        file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
+                        mime="text/csv",
+                        key='download-csv'
+                    )
+                with col2:
+                    # Generate Excel file
+                    excel_data = convert_df_to_excel(final_df)
+                    st.download_button(
+                        label="Download Excel Report",
+                        data=excel_data,
+                        file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
         except Exception as e:
             st.write(e)
