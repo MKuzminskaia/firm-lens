@@ -60,7 +60,52 @@ COMPANY_LIST_FOR_ENRICHING = [
 
 final_company_list : list[Company] = []
 
+def show_result_Table():
+    final_result()
+    if st.session_state.company_list_for_enriching:     
+        final_df = pd.DataFrame(st.session_state.company_list_for_enriching)        
+        st.subheader("Result of deep analysis:")
+        st.dataframe(final_df,
+                        column_config={
+                        "company_id" : None,
+                        "company_name": st.column_config.TextColumn("Company Name", width="medium"),
+                        "website": st.column_config.LinkColumn("Website", width="medium"),
+                        "country": st.column_config.TextColumn("Country", width="medium"),
+                        "score": st.column_config.NumberColumn("Score",),
+                        "reasons": st.column_config.TextColumn("Analysis Details", width="large")
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                        )
+            
+        col1, col2 = st.columns(2)
+        file_name = "firm_lens_report"
+        with col1:
+            # Download *.csv file 
+            csv = convert_df_to_csv(final_df)
+            st.download_button(
+                label = "Download CSV",
+                data = csv,
+                file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
+                mime="text/csv",
+                key=f"download_csv_{st.session_state.get('search_mode')}"
+            )
+        with col2:
+            # Generate Excel file
+            excel_data = convert_df_to_excel(final_df)
+            st.download_button(
+                label="Download Excel Report",
+                data=excel_data,
+                file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"download_excel_{st.session_state.get('search_mode')}"
+            )
+        return True
+    return False    
+
+
 # generating final table with scoring
+#---------------------------------------------------------------------------------------------------------
 def final_result():
     if st.session_state['company_list_for_enriching']:
         try:
@@ -75,49 +120,53 @@ def final_result():
                 .agg(" ".join , axis=1)
                 .apply(lambda x: ScorerService.calculate_score(x, st.session_state.pos_rules_list, st.session_state.neg_rules_list))
                 .apply(pd.Series))
+            
+            for i, company_obj in enumerate(st.session_state.company_list_for_enriching):
+                company_obj.score = final_df.at[i, 'score']
+                company_obj.reasons = final_df.at[i, 'reasons']
 
-            if not final_df.empty:     
-                
-                st.subheader("Result of deep analysis:")
-                #st.table(final_df) 
-                st.dataframe(final_df,
-                             column_config={
-                                "company_id" : None,
-                                "company_name": st.column_config.TextColumn("Company Name", width="medium"),
-                                "website": st.column_config.LinkColumn("Website", width="medium"),
-                                "country": st.column_config.TextColumn("Country", width="medium"),
-                                "score": st.column_config.NumberColumn("Score",),
-                                "reasons": st.column_config.TextColumn("Analysis Details", width="large")
-                                },
-                             hide_index=True,
-                             use_container_width=True
-                             )
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    # Download *.csv file 
-                    csv = convert_df_to_csv(final_df)
-                    file_name = "firm_lens_report"
-                    st.download_button(
-                        label = "Download CSV",
-                        data = csv,
-                        file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
-                        mime="text/csv",
-                        key='download-csv'
-                    )
-                with col2:
-                    # Generate Excel file
-                    excel_data = convert_df_to_excel(final_df)
-                    st.download_button(
-                        label="Download Excel Report",
-                        data=excel_data,
-                        file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-
+            #st.session_state.company_list_for_enriching = final_df.to_dict(orient='records')
         except Exception as e:
             st.write(e)
 
+
+# prepare table from file: enriching
+#---------------------------------------------------------------------------------------------------------
+def enrich_prepare():
+    with st.container(border=True):
+        # enriching list of companies in BY_FILE search mode
+        selected_rows = []
+        #if st.session_state.search_mode == SearchMode.BY_FILE and 'founded_list_of_companies_from_file' in st.session_state:
+        if 'founded_list_of_companies_from_file' in st.session_state:
+        
+            df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
+            for i in range( len(df)):
+                selected_rows.append(i)   
+
+
+        #if st.session_state.search_mode == SearchMode.BY_FILE:
+        enriched_data = st.session_state.company_list_for_enriching
+        progress_iterator = 0
+        my_bar = st.progress(progress_iterator, text="Enriching progress")
+        new_data : Company
+        for row_number in selected_rows:
+            try:
+                row = df.iloc[row_number].to_dict()  
+                current_company_id = row['company_id']
+                new_data = st.session_state.wiki_service.enrich_company(current_company_id, '', '') #.to_dict()
+                # check whether the new company is already included or not
+                if any(c.company_id == current_company_id for c in enriched_data):
+                    pass
+                else: 
+                    enriched_data.append(new_data)
+            except Exception as e:
+                st.warning(e)
+            progress_iterator+=1
+            my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
+            
+        my_bar.empty()
+        st.session_state.company_list_for_enriching = enriched_data  
+        final_result()
 
 # sidebar with rules for scoring
 #--------------------------------------------------------------------------------------------------------
@@ -203,6 +252,10 @@ with tab1:
         if st.button("Submit", 
                      key = 'btn_search_company_by_name',
                      disabled = dis_button):
+            if st.session_state.get('search_mode') != SearchMode.INDIVIDUAL:
+                st.session_state.company_list_for_enriching = []
+                st.session_state.search_mode = SearchMode.INDIVIDUAL
+
             try:
                 final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], '')
                 data_for_table = [rare.to_dict() for rare in final_company_list]
@@ -250,15 +303,23 @@ with tab1:
                         for row_number in selected_rows:
                             try:
                                 row = df.iloc[row_number].to_dict()  
-                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                                enriched_data.append(new_data)
+                                
+                                current_company_id = row['company_id']
+                                new_data = st.session_state.wiki_service.enrich_company(current_company_id, '', '') #.to_dict()
+                                # check whether the new company is already included or not
+                                if any(c.company_id == current_company_id for c in enriched_data):
+                                    pass
+                                else: 
+                                    enriched_data.append(new_data)
                             except Exception as e:
-                                st.warning(e)
+                                st.warning(f"Error after enriched_data build: {e}")
                             progress_iterator+=1
                             my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
                         my_bar.empty()    
                         st.session_state.company_list_for_enriching = enriched_data    
-                        final_result()
+
+            if st.session_state.search_mode == SearchMode.INDIVIDUAL:
+                show_result_Table()
 
 
 with tab2:  
@@ -266,7 +327,10 @@ with tab2:
     with st.container(border=True):
         column: str
         uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
-        if uploaded_file is not None:
+        if uploaded_file  is not None:
+            
+            #st.session_state.search_mode = SearchMode.BY_FILE
+
             results = pd.read_csv(uploaded_file, sep=None, engine='python')
             
             table_columns = [f.name for f in fields(Company)]
@@ -295,34 +359,10 @@ with tab2:
                 label="Quick search",
                 key="quick_search_by_file",
                 disabled = dis_button
-            ): st.session_state.search_mode = SearchMode.BY_FILE            # further enrichment is carried out according to the file data
-
-
-            if st.session_state.search_mode != SearchMode.NOT_DEFINED:  
-                with st.container(border=True):
-                    # enriching list of companies in BY_FILE search mode
-                    selected_rows = []
-                    if st.session_state.search_mode == SearchMode.BY_FILE and 'founded_list_of_companies_from_file' in st.session_state:
-                        df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
-                        for i in range( len(df)):
-                            selected_rows.append(i)   
-
-                    if st.session_state.search_mode == SearchMode.BY_FILE:
-                        enriched_data = st.session_state.company_list_for_enriching
-                        progress_iterator = 0
-                        my_bar = st.progress(progress_iterator, text="Enriching progress")
-                        for row_number in selected_rows:
-                            try:
-                                row = df.iloc[row_number].to_dict()  
-                                new_data = st.session_state.wiki_service.enrich_company(row['company_id'], '', '').to_dict()
-                                enriched_data.append(new_data)
-                            except Exception as e:
-                                st.warning(e)
-                            progress_iterator+=1
-                            my_bar.progress(value=int(progress_iterator*100/len(selected_rows)), text="Enriching progress")
-                            
-                        my_bar.empty()
-                        st.session_state.company_list_for_enriching = enriched_data  
-                        final_result()
-
-       
+            ): 
+                if st.session_state.get('search_mode') != SearchMode.BY_FILE:
+                    st.session_state.company_list_for_enriching = [] 
+                    st.session_state.founded_list_of_companies = [''] 
+                    st.session_state.search_mode = SearchMode.BY_FILE
+                enrich_prepare() 
+                show_result_Table()
