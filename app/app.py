@@ -3,26 +3,24 @@ import pandas as pd
 import json as js
 from dataclasses import fields
 import os
+import config
 
 from core.models import Company, SearchMode
 from core.services import WikidataService, ScorerService
 from core.utils import clean_str, convert_df_to_csv, load_rules, save_rules, convert_df_to_excel
 
 
-st.markdown(
-    """
+st.markdown(f"""
     <style>
-    [data-testid="stSidebar"] {
-        min-width: 300px;
-        max-width: 300px;
-    }
+    [data-testid="stSidebar"] {{
+        min-width: {config.SIDEBAR_MIN_WIDTH};
+        max-width: {config.SIDEBAR_MAX_WIDTH};
+    }}
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
 
-st.title("0.9 Layer")
-st.header("Firm-Lens")
+st.title(config.APP_TITLE)
+st.header(config.APP_HEADER)
 
 
 # Default State
@@ -45,17 +43,6 @@ if 'initial_check' not in st.session_state:
     st.session_state.founded_list_of_companies_from_file = dict()  #
 
     st.session_state.search_mode = SearchMode.NOT_DEFINED   # Search mode : individual or by file
-
-COMPANY_LIST_FOR_ENRICHING = [
-    {
-        'company_name' : 'empty', 
-        'company_id': 'empty',
-        'website' : 'empty', 
-        'country' : 'empty',
-        'industry' : 'empty',
-        #'description' : 'empty'
-    }
-]
                                
 
 final_company_list : list[Company] = []
@@ -79,7 +66,7 @@ def show_result_Table():
                         )
             
         col1, col2 = st.columns(2)
-        file_name = "firm_lens_report"
+        file_name = config.EXPORT_FILE_PREFIX
         with col1:
             # Download *.csv file 
             csv = convert_df_to_csv(final_df)
@@ -87,7 +74,7 @@ def show_result_Table():
                 label = "Download CSV",
                 data = csv,
                 file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.csv",
-                mime="text/csv",
+                mime=config.CSV_MIME_TYPE,
                 key=f"download_csv_{st.session_state.get('search_mode')}"
             )
         with col2:
@@ -97,7 +84,7 @@ def show_result_Table():
                 label="Download Excel Report",
                 data=excel_data,
                 file_name=f"{file_name}_{pd.Timestamp.now().strftime('%Y-%m-%d-%H-%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                mime=config.EXCEL_MIME_TYPE,
                 key=f"download_excel_{st.session_state.get('search_mode')}"
             )
         return True

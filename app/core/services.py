@@ -1,7 +1,16 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import config
+
 import requests 
 from .models import Company
 from  core.utils import clean_str
 import streamlit as st
+
+
 
 BOOST_KEYWORDS = ['company', 
                   'enterprise', 
@@ -26,10 +35,10 @@ PENALTY_KEYWORDS = ['film',
 
 class WikidataService:
     def __init__(self):
-        self.url = "https://query.wikidata.org/sparql"
+        self.url = config.WIKIDATA_SPARQL_URL 
         self.headers = {
-            'User-Agent': 'FirmLensBot/1.0 (blackmarka@gmail.com)', 
-            'Accept': 'application/sparql-results+json'
+            'User-Agent': config.USER_AGENT, 
+            'Accept': config.ACCEPT
         }
 
     # returns a short list of companies that match the parameters 
@@ -43,7 +52,7 @@ class WikidataService:
         if not company_name:
             raise ValueError("Company Name is empty")
         
-        search_url = "https://www.wikidata.org/w/api.php"
+        search_url = config.WIKIDATA_API_URL
         search_params = {
             "action": "wbsearchentities",
             "language": "en",
@@ -57,7 +66,7 @@ class WikidataService:
             search_res = requests.get(search_url, 
                                       params=search_params, 
                                       headers=_self.headers,
-                                      timeout=10)
+                                      timeout=config.API_TIMEOUT)
             
             if search_res.status_code != 200:
                 st.error(f"Wikidata Search API error: {search_res.status_code}")
@@ -90,7 +99,7 @@ class WikidataService:
                     }}
                     """
                 
-            response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=20)
+            response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
             data = response.json()
             results = data.get('results', {}).get('bindings', [])
 
@@ -179,7 +188,7 @@ class WikidataService:
 
             try:
                 
-                response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=10)
+                response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
                 data = response.json()
                 results = data.get('results', {}).get('bindings', [])
                 
@@ -195,8 +204,6 @@ class WikidataService:
                     )
                     
                     for res in results:
-                        #if res.get('industryLabel', {}) != "N/A" and res.get('industryLabel', {}) in one_company_result.industry: 
-                        #    one_company_result.industry.append(res.get('industryLabel', {}).get('value', "N/A"))
                         ind_label = res.get('industryLabel', {}).get('value', "N/A")    
                         if ind_label != "N/A" and ind_label not in one_company_result.industry:
                             one_company_result.industry.append(ind_label)
