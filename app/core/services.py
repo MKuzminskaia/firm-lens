@@ -21,7 +21,7 @@ class WikidataService:
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    @st.cache_data() #(ttl=3600)
+    #@st.cache_data() #(ttl=3600)
     def search_companies(_self, company_name :str, website: str, country: str) -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
@@ -140,7 +140,6 @@ class WikidataService:
 
     # returns the enriched list of one company by id 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    @st.cache_data(ttl=3600)
     def enrich_company(_self, company_id :str, website: str, country: str) -> Company:  #-> dict [str, str]:  #-> Company:
         company_id = company_id.strip()
 
