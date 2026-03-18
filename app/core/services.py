@@ -11,28 +11,6 @@ from  core.utils import clean_str
 import streamlit as st
 
 
-
-BOOST_KEYWORDS = ['company', 
-                  'enterprise', 
-                  'business', 
-                  'corporation', 
-                  'firm', 
-                  'manufacturer', 
-                  'inc', 
-                  'gmbh'
-                  ]
-
-PENALTY_KEYWORDS = ['film', 
-                    'movie', 
-                    'song', 
-                    'album', 
-                    'single', 
-                    'human', 
-                    'person', 
-                    'biography', 
-                    'fictional'
-                    ]
-
 class WikidataService:
     def __init__(self):
         self.url = config.WIKIDATA_SPARQL_URL 
@@ -131,11 +109,11 @@ class WikidataService:
                 # basic "weight" of item instead of description
                 weight = 0
 
-                for word in BOOST_KEYWORDS:
+                for word in config.BOOST_KEYWORDS:
                     if word in description:
                         weight +=10
 
-                for word in PENALTY_KEYWORDS:
+                for word in config.PENALTY_KEYWORDS:
                     if word in description:
                         weight -=20
 

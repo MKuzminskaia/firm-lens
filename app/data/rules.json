@@ -1,0 +1,38 @@
+{
+    "pos": [
+        {
+            "Keyword": "medical",
+            "Points": 30
+        },
+        {
+            "Keyword": "health",
+            "Points": 25
+        },
+        {
+            "Keyword": "clinic",
+            "Points": 20
+        },
+        {
+            "Keyword": "ai",
+            "Points": 10
+        },
+        {
+            "Keyword": "internet",
+            "Points": 10
+        },
+        {
+            "Keyword": "technology",
+            "Points": 50
+        }
+    ],
+    "neg": [
+        {
+            "Keyword": "gambling",
+            "Points": -100
+        },
+        {
+            "Keyword": "adult",
+            "Points": -100
+        }
+    ]
+}

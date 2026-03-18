@@ -1,31 +1,18 @@
 import streamlit as st
 import pandas as pd
+import sys
 import os
 import io
 import json as js
 
-GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corp']
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-RULES_FILE = "scoring_rules.json"
-
-POS_RULES = {
-    "medical": 30,
-    "health": 25,
-    "clinic": 20,
-    "ai": 10,
-    "internet": 10,
-}
-
-
-NEG_RULES = {
-    "gambling": -100,
-    "adult": -100,
-}
+import config
 
 # clean garbage words wrom list GARBAGE_WORDS
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def clean_str(dirty_str: str) -> str:
-    for garbage_word in GARBAGE_WORDS:
+    for garbage_word in config.GARBAGE_WORDS:
         dirty_str = dirty_str.replace(garbage_word, "")
     dirty_str = dirty_str.strip().capitalize()
     return dirty_str
@@ -40,19 +27,26 @@ def convert_df_to_csv(df : pd.DataFrame) -> bytes :
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 def load_rules():
-    if os.path.exists(RULES_FILE):
-        with open(RULES_FILE,"r") as f:
+    if os.path.exists(config.RULES_FILE_PATH):
+        with open(config.RULES_FILE_PATH,"r", encoding='utf-8') as f:
             return js.load(f)
-    return {"pos": [{"Keyword": k, "Points": p} for k,p, in POS_RULES.items()],
-            "neg": [{"Keyword": k, "Points": p} for k,p, in NEG_RULES.items()]}
+    return {"pos": [{"Keyword": k, "Points": p} for k,p, in config.POS_RULES.items()],
+            "neg": [{"Keyword": k, "Points": p} for k,p, in config.NEG_RULES.items()]}
 
 
 # saving file with information about scoring rules 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def save_rules(pos, neg):
-    with open(RULES_FILE, "w") as f:
-        js.dump({"pos" : pos, "neg" : neg}, f)
-    st.success("Rules saved successfully!")    
+    # Extract the path to the folder itself (cut off rules.json)
+    directory = os.path.dirname(config.RULES_FILE_PATH)
+    
+    # Create the folder if it doesn't exist.
+    os.makedirs(directory, exist_ok=True)
+    
+    with open(config.RULES_FILE_PATH, "w", encoding="utf-8") as f:
+        js.dump({"pos" : pos, "neg" : neg}, f, ensure_ascii=False, indent=4)
+        
+    st.success("Rules saved successfully!") 
 
 # convert dataframe object to Excel file format 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
