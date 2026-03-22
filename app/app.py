@@ -249,11 +249,12 @@ with tab1:
                 st.session_state.search_mode = SearchMode.INDIVIDUAL
 
             try:
-                final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], '')
-                data_for_table = [rare.to_dict() for rare in final_company_list]
-                results_df = pd.DataFrame(data_for_table)
-                st.session_state['founded_list_of_companies'] = data_for_table
-                st.session_state.search_mode = SearchMode.INDIVIDUAL
+                with st.spinner("In process"):
+                    final_company_list = st.session_state.wiki_service.search_companies(search_info['company_name'], search_info['website'], search_info['country'])
+                    data_for_table = [rare.to_dict() for rare in final_company_list]
+                    results_df = pd.DataFrame(data_for_table)
+                    st.session_state['founded_list_of_companies'] = data_for_table
+                    st.session_state.search_mode = SearchMode.INDIVIDUAL
             except Exception as e:
                 st.write(e)   
 
@@ -357,7 +358,6 @@ with tab2:
                 st.session_state.file_column_company_name = file_column_company_name
             else: 
                 st.session_state.file_column_company_name = ''
-            st.write(st.session_state.file_column_company_name)
 
             file_column_website = st.selectbox("Select column with company website for searching:",
                                 table_columns,
@@ -368,7 +368,6 @@ with tab2:
                 st.session_state.file_column_website = file_column_website
             else: 
                 st.session_state.file_column_website = ''
-            st.write(st.session_state.file_column_website)
 
             file_column_country = st.selectbox("Select column with company country for searching:",
                                 table_columns,
@@ -379,7 +378,6 @@ with tab2:
                 st.session_state.file_column_country = file_column_country
             else: 
                 st.session_state.file_column_country = ''
-            st.write(st.session_state.file_column_country)
 
             file_columns_enrich = st.multiselect("Select column names for enriching: ",
                                 table_columns)
@@ -399,12 +397,23 @@ with tab2:
                     st.session_state.search_mode = SearchMode.BY_FILE
 
                 enriched_data = []
+                progress_iterator = 0
+                my_bar = st.progress(progress_iterator, text="Enriching progress")
                 for comp in st.session_state.founded_list_of_companies_from_file:
-                    # st.write(st.session_state.founded_list_of_companies_from_file)
-                    company_name = comp[file_column_company_name]
-                    website = comp[file_column_website]
-                    country = comp[file_column_country]
+                    if st.session_state.file_column_company_name:
+                        company_name = comp[file_column_company_name]
+                    else:
+                        company_name = ''
+                    if st.session_state.file_column_website:
+                        website = comp[file_column_website]
+                    else: 
+                        website = ''
+                    if st.session_state.file_column_country:  
+                        country = comp[file_column_country]
+                    else:     
+                        country = ''
                     enriched_data.append(st.session_state.wiki_service.process_raw_company(company_name, website, country))
-                st.session_state.company_list_for_enriching = enriched_data
-                # enrich_prepare() 
+                    my_bar.progress(value=int(progress_iterator*100/len(st.session_state.founded_list_of_companies_from_file)), text="Enriching progress")
+                    progress_iterator+=1
+                my_bar.empty()  
                 show_result_Table()

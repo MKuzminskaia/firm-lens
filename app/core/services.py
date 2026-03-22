@@ -22,10 +22,14 @@ class WikidataService:
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
     #@st.cache_data() #(ttl=3600)
-    def search_companies(_self, company_name :str, website: str, country: str) -> list[Company]: 
+    def search_companies(_self, company_name :str, website: str = '', country: str = '') -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
         result_info : dict [str, Company] = {}
+
+        if website.strip() == 'https://':
+            website = ''
+            # st.write(f"Yep, I stripped it ")
 
         if not company_name:
             raise ValueError("Company Name is empty")
@@ -66,40 +70,50 @@ class WikidataService:
                         VALUES ?item {{ {id_list} }}
                         ?item wdt:P31/wdt:P279* wd:Q4830453 . """
             
-            if website.strip() and website.strip() != 'https://':
-                query += f"?item wdt:P856 <{website}> . "
-                query += f"BIND(<{website}> AS ?website) "  
-            else:
-                query += "OPTIONAL { ?item wdt:P856 ?website . } "
-            query += f"""OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
-                        OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
+            # if website.strip() and website.strip() != 'https://':
+            #     query += f"?item wdt:P856 <{website}> . "
+            #     query += f"BIND(<{website}> AS ?website) "  
+            # else:
+            #     query += "OPTIONAL { ?item wdt:P856 ?website . } "
+            query += f"""OPTIONAL {{ ?item wdt:P856 ?website . }} 
+                        OPTIONAL {{ ?item wdt:P17 ?country. 
+                                    ?country rdfs:label ?countryLabel. 
+                                    FILTER(LANG(?countryLabel) = "en") }}
+                        OPTIONAL {{ ?item wdt:P452 ?industry. 
+                                    ?industry rdfs:label ?industryLabel. 
+                                    FILTER(LANG(?industryLabel) = "en") }}
                         SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-                    }}
-                    """
+                    }}"""
                 
             response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
             data = response.json()
             results = data.get('results', {}).get('bindings', [])
-
+            # st.write(results)
 
             companies_dict: dict[str, Company] = {}
 
             for res in results:
+                
                 c_id = res.get('item', {}).get('value', "N/A")
+                
                 ind_label = res.get('industryLabel', {}).get('value', "N/A")
 
-                if c_id not in companies_dict:
-                    companies_dict[c_id] = Company(
-                        company_id=c_id,
-                        company_name=res.get('itemLabel', {}).get('value', "N/A"),
-                        website=res.get('website', {}).get('value', "N/A"),
-                        country=res.get('countryLabel', {}).get('value', "N/A"),
-                        industry=[ind_label] if ind_label != "N/A" else [],
-                        description=res.get('itemDescription', {}).get('value', 'N/A')
-                    )
-                else:
-                    if ind_label != "N/A" and ind_label not in companies_dict[c_id].industry:
-                        companies_dict[c_id].industry.append(ind_label)
+
+                comp = Company(
+                            company_id=c_id,
+                            company_name=res.get('itemLabel', {}).get('value', "N/A"),
+                            website=res.get('website', {}).get('value', "N/A"),
+                            country=res.get('countryLabel', {}).get('value', "N/A"),
+                            industry=[ind_label] if ind_label != "N/A" else [],
+                            description=res.get('itemDescription', {}).get('value', 'N/A')
+                        )
+                
+                if (not website or comp.website == website) and (not country or comp.country == country):
+                    if c_id not in companies_dict:
+                        companies_dict[c_id] = comp
+                    else:
+                        if ind_label != "N/A" and ind_label not in companies_dict[c_id].industry:
+                            companies_dict[c_id].industry.append(ind_label)
 
             ranked_candidates = []
             
@@ -134,41 +148,38 @@ class WikidataService:
             return result #list(companies_dict.values())
 
         except Exception as e:
-            # st.error(f"Search failed: {e}")
+            st.error(f"Search failed: {e}")
             return []
 
 
     # returns the enriched list of one company by id 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    def enrich_company(_self, company_id :str, website: str, country: str) -> Company:  #-> dict [str, str]:  #-> Company:
+    def enrich_company(_self, company_id :str, website: str, country: str) -> Company: 
         company_id = company_id.strip()
 
         result_company : dict [str, Company] = {}
-
         if not company_id or company_id == 'N/A':
             raise ValueError("Company Name is empty")
         else: 
             company_id = company_id.split('/')[-1]
             query = f"""SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
-                    BIND(wd:{company_id} AS ?item) ."""
-            if website:
-                query += f"""?item wdt:P856 "<{website}>" ."""    
-            if country:
-                query += f"""?item wdt:P17 "{country}"@en ."""    
-            query += f"""?item wdt:P31/wdt:P279* wd:Q4830453 .
+                    BIND(wd:{company_id} AS ?item) .
+                    ?item wdt:P31/wdt:P279* wd:Q4830453 .
                     OPTIONAL {{ ?item wdt:P856 ?website. }}
-                    OPTIONAL {{ ?item wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }}
-                    OPTIONAL {{ ?item wdt:P452 ?industry. ?industry rdfs:label ?industryLabel. FILTER(LANG(?industryLabel) = "en") }}
+                    OPTIONAL {{ ?item wdt:P17 ?country. 
+                                ?country rdfs:label ?countryLabel. 
+                                FILTER(LANG(?countryLabel) = "en") }}
+                    OPTIONAL {{ ?item wdt:P452 ?industry. 
+                                ?industry rdfs:label ?industryLabel. 
+                                FILTER(LANG(?industryLabel) = "en") }}
                     SERVICE wikibase:label {{bd:serviceParam wikibase:language "en". }}
-                    }}
-                    """
+                    }}"""
 
             try:
                 
                 response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
                 data = response.json()
                 results = data.get('results', {}).get('bindings', [])
-                
                 if not results:
                     return Company(company_id = '',company_name= '', country='', industry='', reasons='', score='', website='' )
                 else:
@@ -180,10 +191,11 @@ class WikidataService:
                         description= results[0].get('itemDescription', {}).get('value', "N/A")
                     )
                     
-                    for res in results:
-                        ind_label = res.get('industryLabel', {}).get('value', "N/A")    
-                        if ind_label != "N/A" and ind_label not in one_company_result.industry:
-                            one_company_result.industry.append(ind_label)
+                    if (not website or one_company_result.website == website) and (not country or one_company_result.country):
+                        for res in results:
+                            ind_label = res.get('industryLabel', {}).get('value', "N/A")    
+                            if ind_label != "N/A" and ind_label not in one_company_result.industry:
+                                one_company_result.industry.append(ind_label)
 
 
                     if one_company_result.company_id not in result_company:
@@ -209,6 +221,7 @@ class WikidataService:
         
         # Enrich candidate with full data
         enriched_data = self.enrich_company(best_candidate_id, website, country)
+        
         return enriched_data
     
 
@@ -220,7 +233,6 @@ class ScorerService:
         total_score = 0
         reasons = []
         text_lower = text.lower()
-
         for pos in pos_rules:
             if pos['Keyword'] in text_lower:
                 total_score += pos['Points']
