@@ -416,4 +416,5 @@ with tab2:
                     my_bar.progress(value=int(progress_iterator*100/len(st.session_state.founded_list_of_companies_from_file)), text="Enriching progress")
                     progress_iterator+=1
                 my_bar.empty()  
+                st.session_state.company_list_for_enriching = enriched_data
                 show_result_Table()
