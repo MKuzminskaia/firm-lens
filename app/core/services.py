@@ -194,6 +194,24 @@ class WikidataService:
         return Company(company_id = '',company_name= '', country='', industry='', reasons='', score='', website='' )
     
 
+    #
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------
+    def process_raw_company(self, name: str, website: str = "", country: str = "") -> Company:
+        # searching companies by name
+        candidates = self.search_companies(name, website, country)
+        
+        if not candidates:
+            return Company(company_id='Not Found', company_name=name, score=-1, reasons='No match found')
+
+        # select the best candidate 
+        # (first candidate for test version)
+        best_candidate_id = candidates[0].company_id 
+        
+        # Enrich candidate with full data
+        enriched_data = self.enrich_company(best_candidate_id, website, country)
+        return enriched_data
+    
+
 class ScorerService:
     # total score and reasons for dict (one row of table)
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -214,3 +232,4 @@ class ScorerService:
                 reasons.append(f"+{neg['Keyword']}:{neg['Points']}")
                 
         return total_score, "; ".join(reasons)
+    

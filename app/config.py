@@ -1,8 +1,7 @@
 import os
 
 # --- BASIC UI SETTINGS ---
-APP_TITLE = "0.9 Layer"
-APP_HEADER = "Firm-Lens"
+APP_TITLE = "Firm-Lens"
 SIDEBAR_MIN_WIDTH = "300px"
 SIDEBAR_MAX_WIDTH = "300px"
 
@@ -15,8 +14,8 @@ RULES_FILE_PATH = os.path.join(BASE_DIR, "data", "rules.json")
 # ---  WIKIDATA API SETTINGS(for WikidataService) ---
 WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
-API_TIMEOUT = 15 # Timeout in seconds so that the application does not hang forever if the server crashes
-USER_AGENT = "FirmLensBot/1.0 (contact@example.com)" # Wikidata requires a User-Agent
+API_TIMEOUT = 25 # Timeout in seconds so that the application does not hang forever if the server crashes
+USER_AGENT = 'FirmLensBot/1.0 (blackmarka@gmail.com)' # Wikidata requires a User-Agent
 ACCEPT = "application/sparql-results+json"
 
 # --- EXPORT SETTINGS ---

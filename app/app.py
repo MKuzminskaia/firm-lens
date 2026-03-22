@@ -20,7 +20,6 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 st.title(config.APP_TITLE)
-st.header(config.APP_HEADER)
 
 
 # Default State
@@ -43,6 +42,12 @@ if 'initial_check' not in st.session_state:
     st.session_state.founded_list_of_companies_from_file = dict()  #
 
     st.session_state.search_mode = SearchMode.NOT_DEFINED   # Search mode : individual or by file
+
+    st.session_state.file_column_company_id = ''            # Selected company id for searching in file
+    st.session_state.file_column_company_name = ''          # Selected company name for searching in file
+    st.session_state.file_column_country = ''               # Selected country for searching in file
+    st.session_state.file_column_website = ''               # Selected website id for searching in file
+    
                                
 
 final_company_list : list[Company] = []
@@ -332,14 +337,55 @@ with tab2:
             with st.expander("Downloaded info from file"):
                 st.dataframe(st.session_state.founded_list_of_companies_from_file)
 
-            file_column_name = st.selectbox("Select column with company name id for searching:",
-                                table_columns)
-            
+            file_column_company_id = st.selectbox("Select column with company id for searching:",
+                                table_columns,
+                                index=None,
+                                placeholder="Select company id column..."
+                                )
+            if file_column_company_id:
+                st.session_state.file_column_company_id = file_column_company_id
+            else: 
+                st.session_state.file_column_company_id = ''
+            st.write(st.session_state.file_column_company_id)
+
+            file_column_company_name = st.selectbox("Select column with company name for searching:",
+                                table_columns,
+                                index=None,
+                                placeholder="Select company name column..."
+                                )
+            if file_column_company_name:
+                st.session_state.file_column_company_name = file_column_company_name
+            else: 
+                st.session_state.file_column_company_name = ''
+            st.write(st.session_state.file_column_company_name)
+
+            file_column_website = st.selectbox("Select column with company website for searching:",
+                                table_columns,
+                                index=None,
+                                placeholder="Select company website column..."
+                                )
+            if file_column_website:
+                st.session_state.file_column_website = file_column_website
+            else: 
+                st.session_state.file_column_website = ''
+            st.write(st.session_state.file_column_website)
+
+            file_column_country = st.selectbox("Select column with company country for searching:",
+                                table_columns,
+                                index=None,
+                                placeholder="Select company country column..."
+                                )
+            if file_column_country:
+                st.session_state.file_column_country = file_column_country
+            else: 
+                st.session_state.file_column_country = ''
+            st.write(st.session_state.file_column_country)
+
             file_columns_enrich = st.multiselect("Select column names for enriching: ",
                                 table_columns)
             st.session_state.enrichment_columns = file_columns_enrich
             
-            if file_columns_enrich: dis_button = False
+            if file_columns_enrich and file_column_company_name: dis_button = False
             else: dis_button = True
 
             if st.button(
@@ -351,5 +397,14 @@ with tab2:
                     st.session_state.company_list_for_enriching = [] 
                     st.session_state.founded_list_of_companies = [''] 
                     st.session_state.search_mode = SearchMode.BY_FILE
-                enrich_prepare() 
+
+                enriched_data = []
+                for comp in st.session_state.founded_list_of_companies_from_file:
+                    # st.write(st.session_state.founded_list_of_companies_from_file)
+                    company_name = comp[file_column_company_name]
+                    website = comp[file_column_website]
+                    country = comp[file_column_country]
+                    enriched_data.append(st.session_state.wiki_service.process_raw_company(company_name, website, country))
+                st.session_state.company_list_for_enriching = enriched_data
+                # enrich_prepare() 
                 show_result_Table()
