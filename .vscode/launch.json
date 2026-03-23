@@ -5,12 +5,13 @@
             "name": "Python: Streamlit",
             "type": "debugpy",
             "request": "launch",
+            "cwd": "${workspaceFolder}/app",
             "module": "streamlit",
             "args": [
                 "run",
-                "${file}",
+                "app.py",
                 "--server.port",
-                "8501"
+                "8501" 
             ]
         }
     ]
