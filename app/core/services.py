@@ -21,7 +21,6 @@ class WikidataService:
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    #@st.cache_data() #(ttl=3600)
     def search_companies(_self, company_name :str, website: str = '', country: str = '') -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
@@ -29,7 +28,6 @@ class WikidataService:
 
         if website.strip() == 'https://':
             website = ''
-            # st.write(f"Yep, I stripped it ")
 
         if not company_name:
             raise ValueError("Company Name is empty")
@@ -68,14 +66,8 @@ class WikidataService:
             query = f"""
                     SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
                         VALUES ?item {{ {id_list} }}
-                        ?item wdt:P31/wdt:P279* wd:Q4830453 . """
-            
-            # if website.strip() and website.strip() != 'https://':
-            #     query += f"?item wdt:P856 <{website}> . "
-            #     query += f"BIND(<{website}> AS ?website) "  
-            # else:
-            #     query += "OPTIONAL { ?item wdt:P856 ?website . } "
-            query += f"""OPTIONAL {{ ?item wdt:P856 ?website . }} 
+                        ?item wdt:P31/wdt:P279* wd:Q4830453 . 
+                        OPTIONAL {{ ?item wdt:P856 ?website . }} 
                         OPTIONAL {{ ?item wdt:P17 ?country. 
                                     ?country rdfs:label ?countryLabel. 
                                     FILTER(LANG(?countryLabel) = "en") }}
@@ -88,7 +80,6 @@ class WikidataService:
             response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
             data = response.json()
             results = data.get('results', {}).get('bindings', [])
-            # st.write(results)
 
             companies_dict: dict[str, Company] = {}
 
@@ -145,7 +136,7 @@ class WikidataService:
                 if item['weight'] >= 0:
                     result.append(item['company'])
                 
-            return result #list(companies_dict.values())
+            return result 
 
         except Exception as e:
             st.error(f"Search failed: {e}")
