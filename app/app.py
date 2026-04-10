@@ -55,7 +55,13 @@ final_company_list : list[Company] = []
 def show_result_Table():
     final_result()
     if st.session_state.company_list_for_enriching:     
-        final_df = pd.DataFrame(st.session_state.company_list_for_enriching)        
+        final_df = pd.DataFrame(st.session_state.company_list_for_enriching)     
+
+        # Cache streamlit protection
+        for col in final_df.columns:
+                final_df[col] = final_df[col].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+
+
         st.subheader("Result of deep analysis:")
         st.dataframe(final_df,
                         column_config={
@@ -132,6 +138,9 @@ def enrich_prepare() -> None:
         if 'founded_list_of_companies_from_file' in st.session_state:
         
             df = pd.DataFrame(st.session_state['founded_list_of_companies_from_file'])
+
+            
+
             for i in range( len(df)):
                 selected_rows.append(i)   
 
@@ -264,6 +273,12 @@ with tab1:
                 # enriching list of new selected companies in INDIVIDUAL search mode
                 if st.session_state.search_mode == SearchMode.INDIVIDUAL and 'founded_list_of_companies' in st.session_state:
                     df = pd.DataFrame(st.session_state['founded_list_of_companies'])
+
+                    # Cache streamlit protection
+                    for col in df.columns:
+                        df[col] = df[col].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+
+
                     s = st.dataframe(df, 
                             selection_mode="multi-row", 
                             on_select="rerun", 
@@ -336,7 +351,11 @@ with tab2:
             st.session_state['founded_list_of_companies_from_file'] = results.to_dict(orient='records')
 
             with st.expander("Downloaded info from file"):
-                st.dataframe(st.session_state.founded_list_of_companies_from_file)
+                # Cache streamlit protection
+                df_file = pd.DataFrame(st.session_state.founded_list_of_companies_from_file)
+                for col in df_file.columns:
+                    df_file[col] = df_file[col].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+                st.dataframe(df_file)
 
             file_column_company_id = st.selectbox("Select column with company id for searching:",
                                 table_columns,
