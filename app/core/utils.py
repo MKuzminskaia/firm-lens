@@ -26,7 +26,7 @@ def convert_df_to_csv(df : pd.DataFrame) -> bytes :
 # lading file with information about scoring rules
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def load_rules():
+def load_rules() -> dict:
     if os.path.exists(config.RULES_FILE_PATH):
         with open(config.RULES_FILE_PATH,"r", encoding='utf-8') as f:
             return js.load(f)
@@ -36,7 +36,7 @@ def load_rules():
 
 # saving file with information about scoring rules 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
-def save_rules(pos, neg):
+def save_rules(pos, neg) -> None:
     # Extract the path to the folder itself (cut off rules.json)
     directory = os.path.dirname(config.RULES_FILE_PATH)
     
@@ -50,7 +50,7 @@ def save_rules(pos, neg):
 
 # convert dataframe object to Excel file format 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
-def convert_df_to_excel(df):
+def convert_df_to_excel(df) -> bytes:
     output = io.BytesIO()
     # use xlsxwriter like a driver
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
