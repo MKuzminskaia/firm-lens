@@ -67,7 +67,7 @@ def show_result_Table():
                         "reasons": st.column_config.TextColumn("Analysis Details", width="large")
                         },
                         hide_index=True,
-                        use_container_width=True
+                        width='stretch'
                         )
             
         col1, col2 = st.columns(2)
@@ -98,7 +98,7 @@ def show_result_Table():
 
 # generating final table with scoring
 #---------------------------------------------------------------------------------------------------------
-def final_result():
+def final_result() -> None:
     if st.session_state['company_list_for_enriching']:
         try:
             
@@ -124,7 +124,7 @@ def final_result():
 
 # prepare table from file: enriching
 #---------------------------------------------------------------------------------------------------------
-def enrich_prepare():
+def enrich_prepare() -> None:
     with st.container(border=True):
         # enriching list of companies in BY_FILE search mode
         selected_rows = []
@@ -171,7 +171,7 @@ with st.sidebar:
             st.session_state.pos_rules_list,
             num_rows="dynamic",
             key = "pos_editor",
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
             "Keyword": st.column_config.TextColumn("Keyword", help="Word to find", required=True),
@@ -185,7 +185,7 @@ with st.sidebar:
             st.session_state.neg_rules_list,
             num_rows="dynamic",
             key = "neg_editor",
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
             "Keyword": st.column_config.TextColumn("Keyword", help="Word to find", required=True),
@@ -227,7 +227,7 @@ tab1, tab2 = st.tabs(["Search by company name",
 with tab1: 
     # menu for company info entering
     with st.container(border=True):
-        company_name = clean_str(st.text_input("\* Enter the company name: ", placeholder="ex. Google inc"))
+        company_name = clean_str(st.text_input("* Enter the company name: ", placeholder="ex. Google inc"))
         website = st.text_input("Enter the company website : ", "https://", placeholder="ex. https://about.google/")
         country = st.text_input("Enter the company country: ")
 

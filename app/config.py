@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # --- BASIC UI SETTINGS ---
 APP_TITLE = "Firm-Lens"
@@ -15,7 +19,9 @@ RULES_FILE_PATH = os.path.join(BASE_DIR, "data", "rules.json")
 WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 API_TIMEOUT = 25 # Timeout in seconds so that the application does not hang forever if the server crashes
-USER_AGENT = 'FirmLensBot/1.0 (blackmarka@gmail.com)' # Wikidata requires a User-Agent
+
+bot_email = os.getenv("BOT_EMAIL", "default_contact@example.com")
+USER_AGENT = 'FirmLensBot/1.0 ({bot_email}})' # Wikidata requires a User-Agent
 ACCEPT = "application/sparql-results+json"
 
 # --- EXPORT SETTINGS ---
