@@ -336,8 +336,6 @@ with tab2:
         column: str
         uploaded_file = st.file_uploader("Select file for analyzing:", type='csv', key='analyzing_file')
         if uploaded_file  is not None:
-            
-            #st.session_state.search_mode = SearchMode.BY_FILE
 
             results = pd.read_csv(uploaded_file, sep=None, engine='python')
             
