@@ -21,7 +21,7 @@ class WikidataService:
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    def search_companies(_self, company_name :str, website: str = '', country: str = '') -> list[Company]: 
+    def search_companies(self, company_name :str, website: str = '', country: str = '') -> list[Company]: 
         company_name = company_name.strip()
         company_name = clean_str(company_name.lower())
         result_info : dict [str, Company] = {}
@@ -45,7 +45,7 @@ class WikidataService:
         try:
             search_res = requests.get(search_url, 
                                       params=search_params, 
-                                      headers=_self.headers,
+                                      headers=self.headers,
                                       timeout=config.API_TIMEOUT)
             
             if search_res.status_code != 200:
@@ -77,7 +77,7 @@ class WikidataService:
                         SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
                     }}"""
                 
-            response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
+            response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=config.API_TIMEOUT)
             data = response.json()
             results = data.get('results', {}).get('bindings', [])
 
@@ -145,7 +145,7 @@ class WikidataService:
 
     # returns the enriched list of one company by id 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
-    def enrich_company(_self, company_id :str, website: str, country: str) -> Company: 
+    def enrich_company(self, company_id :str, website: str, country: str) -> Company: 
         company_id = company_id.strip()
 
         result_company : dict [str, Company] = {}
@@ -168,7 +168,7 @@ class WikidataService:
 
             try:
                 
-                response = requests.get(_self.url, params = {'query' : query, 'format': 'json'}, headers = _self.headers, timeout=config.API_TIMEOUT)
+                response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=config.API_TIMEOUT)
                 data = response.json()
                 results = data.get('results', {}).get('bindings', [])
                 if not results:
