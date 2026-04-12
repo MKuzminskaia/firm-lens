@@ -30,7 +30,7 @@ CSV_MIME_TYPE = "text/csv"
 EXCEL_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # --- DEFAULT DICTIONARIES AND LISTS IN UYILS.PY---
-GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corp']
+GARBAGE_WORDS = ['llc', 'ltd', 'inc', 'corporation', 'corp', 'company', 'comp', 'gmbh', 'limited']
 
 POS_RULES = {
     "medical": 30,
