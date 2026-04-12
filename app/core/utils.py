@@ -3,6 +3,7 @@ import pandas as pd
 import sys
 import os
 import io
+import re
 import json as js
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -13,8 +14,8 @@ import config
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 def clean_str(dirty_str: str) -> str:
     for garbage_word in config.GARBAGE_WORDS:
-        dirty_str = dirty_str.replace(garbage_word, "")
-    dirty_str = dirty_str.strip().capitalize()
+        dirty_str = re.sub(r'\b' + re.escape(garbage_word) + r'\b\.?', '', dirty_str, flags=re.IGNORECASE)
+    dirty_str = dirty_str.strip(' ,.').capitalize()
     return dirty_str
 
 
