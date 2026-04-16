@@ -53,6 +53,32 @@ class WikidataService:
                 result.append(item['company'])
                 
         return result
+    
+    
+    # Fetches detailed company information from Wikidata using a SPARQL query
+    def _fetch_sparql_data(self, search_results: list[dict]) -> list[dict]:
+        ids = [item['id'] for item in search_results]
+        id_list = " ".join([f"wd:{i}" for i in ids])
+        
+        query = f"""
+                SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
+                    VALUES ?item {{ {id_list} }}
+                    ?item wdt:P31/wdt:P279* wd:Q4830453 . 
+                    OPTIONAL {{ ?item wdt:P856 ?website . }} 
+                    OPTIONAL {{ ?item wdt:P17 ?country. 
+                                ?country rdfs:label ?countryLabel. 
+                                FILTER(LANG(?countryLabel) = "en") }}
+                    OPTIONAL {{ ?item wdt:P452 ?industry. 
+                                ?industry rdfs:label ?industryLabel. 
+                                FILTER(LANG(?industryLabel) = "en") }}
+                    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+                }}"""
+            
+        response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=config.API_TIMEOUT)
+        data = response.json()
+        results = data.get('results', {}).get('bindings', [])
+        return results
+
 
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -95,26 +121,7 @@ class WikidataService:
             if not search_results:
                 return []  #return null if found nothing 
         
-            ids = [item['id'] for item in search_results]
-            id_list = " ".join([f"wd:{i}" for i in ids])
-            
-            query = f"""
-                    SELECT DISTINCT ?item ?itemDescription ?itemLabel ?website ?countryLabel ?industryLabel WHERE {{
-                        VALUES ?item {{ {id_list} }}
-                        ?item wdt:P31/wdt:P279* wd:Q4830453 . 
-                        OPTIONAL {{ ?item wdt:P856 ?website . }} 
-                        OPTIONAL {{ ?item wdt:P17 ?country. 
-                                    ?country rdfs:label ?countryLabel. 
-                                    FILTER(LANG(?countryLabel) = "en") }}
-                        OPTIONAL {{ ?item wdt:P452 ?industry. 
-                                    ?industry rdfs:label ?industryLabel. 
-                                    FILTER(LANG(?industryLabel) = "en") }}
-                        SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-                    }}"""
-                
-            response = requests.get(self.url, params = {'query' : query, 'format': 'json'}, headers = self.headers, timeout=config.API_TIMEOUT)
-            data = response.json()
-            results = data.get('results', {}).get('bindings', [])
+            results = self._fetch_sparql_data(search_results)
 
             companies_dict: dict[str, Company] = {}
 
