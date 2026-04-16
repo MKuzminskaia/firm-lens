@@ -19,6 +19,40 @@ class WikidataService:
             'Accept': config.ACCEPT
         }
 
+
+    def _rank_candidates(self, candidates: list[Company]) -> list[Company]:
+        ranked_candidates = []
+        
+        for item in candidates:
+            description = item.description.lower()
+            
+            # basic "weight" of item instead of description
+            weight = 0
+
+            for word in config.BOOST_KEYWORDS:
+                if word in description:
+                    weight +=10
+
+            for word in config.PENALTY_KEYWORDS:
+                if word in description:
+                    weight -=20
+
+            ranked_candidates.append({
+                'id' : item.company_id,
+                'weight' : weight,
+                'company' : item
+                }
+            )
+
+        ranked_candidates.sort(key=lambda x: x["weight"], reverse=True)
+        # if weight < 0 , dont add to result list
+        result = []
+        for item in ranked_candidates:
+            if item['weight'] >= 0:
+                result.append(item['company'])
+                
+        return result
+
     # returns a short list of companies that match the parameters 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------
     def search_companies(self, company_name :str, website: str = '', country: str = '') -> list[Company]: 
@@ -105,38 +139,8 @@ class WikidataService:
                     else:
                         if ind_label != "N/A" and ind_label not in companies_dict[c_id].industry:
                             companies_dict[c_id].industry.append(ind_label)
-
-            ranked_candidates = []
-            
-            for item in list(companies_dict.values()):
-                description = item.description.lower()
                 
-                # basic "weight" of item instead of description
-                weight = 0
-
-                for word in config.BOOST_KEYWORDS:
-                    if word in description:
-                        weight +=10
-
-                for word in config.PENALTY_KEYWORDS:
-                    if word in description:
-                        weight -=20
-
-                ranked_candidates.append({
-                    'id' : item.company_id,
-                    'weight' : weight,
-                    'company' : item
-                    }
-                )
-
-            ranked_candidates.sort(key=lambda x: x["weight"], reverse=True)
-            # if weight < 0 , dont add to result list
-            result = []
-            for item in ranked_candidates:
-                if item['weight'] >= 0:
-                    result.append(item['company'])
-                
-            return result 
+            return self._rank_candidates(list(companies_dict.values()))
 
         except Exception as e:
             st.error(f"Search failed: {e}")
