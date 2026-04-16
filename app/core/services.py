@@ -19,8 +19,8 @@ class WikidataService:
             'Accept': config.ACCEPT
         }
 
-
-    def _rank_candidates(self, candidates: list[Company]) -> list[Company]:
+    # Ranks candidates based on the presence of certain keywords in their description and returns a sorted list of companies
+    def _rank_candidates(self, candidates: list[Company], boost_keywords: list[str], penalty_keywords: list[str]) -> list[Company]:
         ranked_candidates = []
         
         for item in candidates:
@@ -29,11 +29,12 @@ class WikidataService:
             # basic "weight" of item instead of description
             weight = 0
 
-            for word in config.BOOST_KEYWORDS:
+            # if description contains boost keyword, add 10 points
+            for word in boost_keywords:
                 if word in description:
                     weight +=10
-
-            for word in config.PENALTY_KEYWORDS:
+            # if description contains penalty keyword, subtract 20 points
+            for word in penalty_keywords:
                 if word in description:
                     weight -=20
 
@@ -140,7 +141,7 @@ class WikidataService:
                         if ind_label != "N/A" and ind_label not in companies_dict[c_id].industry:
                             companies_dict[c_id].industry.append(ind_label)
                 
-            return self._rank_candidates(list(companies_dict.values()))
+            return self._rank_candidates(list(companies_dict.values()), config.BOOST_KEYWORDS, config.PENALTY_KEYWORDS)
 
         except Exception as e:
             st.error(f"Search failed: {e}")

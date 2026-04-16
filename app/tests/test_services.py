@@ -3,7 +3,7 @@ import requests
 
 from unittest.mock import patch
 from core.services import ScorerService, WikidataService
-
+from core.models import Company
 
 def test_calculate_score_mixed_rules():
     # ARRANGE: Preparing data for the test
@@ -38,11 +38,11 @@ def test_calculate_score_mixed_rules():
 
 def test_search_empty_company_name():
     #ARRANGE: Preparing data for the test
-    WikiService = WikidataService()
+    wikiService = WikidataService()
 
     #ACT & ASSERT: Calling the method we want to test and Checking if the results are expected  
     with pytest.raises (ValueError, match="Company Name is empty"):
-       results = WikiService.search_companies("", "", "")  # Testing with an empty string should raise an exception
+       results = wikiService.search_companies("", "", "")  # Testing with an empty string should raise an exception
 
 
 #ARRANGE: Preparing data for the test
@@ -54,11 +54,11 @@ def test_search_empty_company_name():
 ])
 def test_search_companies (company_name, website, country, result_exists):
     # ARRANGE: Preparing data for the test
-    WikiService = WikidataService()
+    wikiService = WikidataService()
 
     # ACT: Calling the method we want to test
     
-    results = WikiService.search_companies(company_name, website, country)  # Testing with valid inputs should return results
+    results = wikiService.search_companies(company_name, website, country)  # Testing with valid inputs should return results
     
     # ASSERT: Checking if the results are as expected
 
@@ -76,24 +76,45 @@ def test_search_companies (company_name, website, country, result_exists):
 
 def test_search_companies_network_timeout():
     # ARRANGE: Preparing data for the test
-    WikiService = WikidataService()
+    wikiService = WikidataService()
 
     # Mock the requests.get method to simulate a network timeout and 
     # Mock the st.error method to prevent actual error messages from being displayed during testing
     with patch('core.services.requests.get') as mock_get, \
         patch('core.services.st.error') as mock_st_error: 
-        
         mock_get.side_effect = requests.exceptions.Timeout("Wikidata API server timeout")
 
         # ACT: Calling the method we want to test 
-        results = WikiService.search_companies("TimeoutCompany", "", "")
+        results = wikiService.search_companies("TimeoutCompany", "", "")
 
-    
         # ASSERT: checking results        
         # result of function should be an empty list when a timeout occurs
         assert results == [], f"Expected an empty list when a timeout occurs, but got {results}"    
         #st.error should have been called to log the error message once
         mock_st_error.assert_called_once()
-
         mock_st_error.assert_called_with("Search failed: Wikidata API server timeout")
 
+
+def test_rank_candidates():
+    #ARRANGE: prepare data for test
+    wikiService = WikidataService()
+    boost_keywords = ["technology", "internet", "ai"]
+    penalty_keywords = ["gambling", "adult", "general"]
+
+    TestCompanys = [
+                    Company( company_id="Q9531", company_name="Google", description="Google is a multinational technology company specializing in internet-related services and products."),
+                    Company( company_id="Q9532", company_name="Google", description="Google is an AI research and deployment company dedicated to ensuring that artificial general intelligence benefits all of humanity."),
+                    Company( company_id="Q9533", company_name="Google", description="")
+                ]
+    
+        
+    #ACT: call _rank_candidates for testimg
+    result = wikiService._rank_candidates(TestCompanys, boost_keywords, penalty_keywords)
+    
+    #ASSERT: check if the results are as expected 
+    assert isinstance(result, list), "Expected result to be a list"
+    assert len(result) == 2, "Expected exactly two companies in the result"
+
+    assert result[0].company_id == "Q9531", f"Expected company_id 'Q9531' to be ranked highest, but got '{result[0].company_id}'"
+    assert result[1].company_id == "Q9533", f"Expected company_id 'Q9533', but got '{result[1].company_id}'"
+    
