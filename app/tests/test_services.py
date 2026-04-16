@@ -1,6 +1,9 @@
 import pytest
+import requests
 
+from unittest.mock import patch
 from core.services import ScorerService, WikidataService
+
 
 def test_calculate_score_mixed_rules():
     # ARRANGE: Preparing data for the test
@@ -30,6 +33,9 @@ def test_calculate_score_mixed_rules():
     assert "+health:25" in reasons
 
 
+#----------------------------------------------------------------------------------------------------------------------------------
+# Tests for the search_companies method in WikidataService
+
 def test_search_empty_company_name():
     #ARRANGE: Preparing data for the test
     WikiService = WikidataService()
@@ -37,7 +43,6 @@ def test_search_empty_company_name():
     #ACT & ASSERT: Calling the method we want to test and Checking if the results are expected  
     with pytest.raises (ValueError, match="Company Name is empty"):
        results = WikiService.search_companies("", "", "")  # Testing with an empty string should raise an exception
-
 
 
 #ARRANGE: Preparing data for the test
@@ -69,4 +74,26 @@ def test_search_companies (company_name, website, country, result_exists):
     else:
         assert len(results) == 0, "Expected no results for invalid company name"
 
+def test_search_companies_network_timeout():
+    # ARRANGE: Preparing data for the test
+    WikiService = WikidataService()
+
+    # Mock the requests.get method to simulate a network timeout and 
+    # Mock the st.error method to prevent actual error messages from being displayed during testing
+    with patch('core.services.requests.get') as mock_get, \
+        patch('core.services.st.error') as mock_st_error: 
+        
+        mock_get.side_effect = requests.exceptions.Timeout("Wikidata API server timeout")
+
+        # ACT: Calling the method we want to test 
+        results = WikiService.search_companies("TimeoutCompany", "", "")
+
     
+        # ASSERT: checking results        
+        # result of function should be an empty list when a timeout occurs
+        assert results == [], f"Expected an empty list when a timeout occurs, but got {results}"    
+        #st.error should have been called to log the error message once
+        mock_st_error.assert_called_once()
+
+        mock_st_error.assert_called_with("Search failed: Wikidata API server timeout")
+
